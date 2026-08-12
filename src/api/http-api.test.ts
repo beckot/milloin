@@ -33,6 +33,18 @@ describe("canonical HTTP API", () => {
     const publicToken = created.publicToken as string;
     expect(publicToken).toBeTruthy();
 
+    const update = await api.updatePoll(
+      jsonRequest(
+        `http://test/api/v1/polls/${publicToken}`,
+        "PATCH",
+        { location: "Otaniemi", durationMinutes: 90 },
+        { authorization: "Bearer owner-secret" },
+      ),
+      publicToken,
+    );
+    expect(update.status).toBe(200);
+    expect((await update.json()).durationMinutes).toBe(90);
+
     const addSlot1 = await api.addSlot(
       jsonRequest(
         `http://test/api/v1/polls/${publicToken}/slots`,
@@ -57,7 +69,9 @@ describe("canonical HTTP API", () => {
 
     const publicPoll = await api.getPoll(publicToken);
     expect(publicPoll.status).toBe(200);
-    expect((await publicPoll.json()).slots).toHaveLength(2);
+    const publicBody = await publicPoll.json();
+    expect(publicBody.slots).toHaveLength(2);
+    expect(publicBody.ownerId).toBeUndefined();
 
     const participant = await api.createParticipant(
       jsonRequest(`http://test/api/v1/polls/${publicToken}/participants`, "POST", {
@@ -69,6 +83,7 @@ describe("canonical HTTP API", () => {
     expect(participant.status).toBe(201);
     const participantBody = await participant.json();
     expect(participantBody.editToken).toBeTruthy();
+    expect(participantBody.poll.ownerId).toBeUndefined();
 
     const edit = await api.updateParticipant(
       jsonRequest(
@@ -81,6 +96,14 @@ describe("canonical HTTP API", () => {
       participantBody.participantId,
     );
     expect(edit.status).toBe(200);
+
+    const results = await api.results(publicToken);
+    expect(results.status).toBe(200);
+    const resultBody = await results.json();
+    expect(resultBody.slots).toEqual([
+      { slotId: "slot-1", yesCount: 1, totalResponses: 1 },
+      { slotId: "slot-2", yesCount: 1, totalResponses: 1 },
+    ]);
 
     const winner = await api.selectWinner(
       jsonRequest(
@@ -129,7 +152,7 @@ describe("canonical HTTP API", () => {
       jsonRequest(
         "http://test/api/v1/polls",
         "POST",
-        { title: "", timezone: "", durationMinutes: -1 },
+        { title: "", timezone: "Not/A-Timezone", durationMinutes: -1 },
         { authorization: "Bearer owner-secret" },
       ),
     );
