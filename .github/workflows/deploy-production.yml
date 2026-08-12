@@ -51,8 +51,10 @@ jobs:
             build=true
           fi
           image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/${SERVICE_NAME}:${tag}"
+          candidate="candidate-$(echo "$GITHUB_SHA" | cut -c1-8)"
           echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
 
       - name: Build tested revision
         if: steps.image.outputs.build == 'true'
@@ -62,34 +64,78 @@ jobs:
         if: steps.image.outputs.build == 'true'
         run: docker push "${{ steps.image.outputs.image }}"
 
-      - name: Deploy image to Cloud Run
+      - name: Deploy candidate with zero production traffic
         env:
           PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          CANDIDATE_TAG: ${{ steps.image.outputs.candidate }}
         run: |
           gcloud run services update "$SERVICE_NAME" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
             --image "${{ steps.image.outputs.image }}" \
+            --no-traffic \
+            --tag "$CANDIDATE_TAG" \
             --quiet
 
-      - name: Capture deployed revision
+      - name: Resolve candidate revision URL
+        id: candidate
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          CANDIDATE_TAG: ${{ steps.image.outputs.candidate }}
+        run: |
+          service_json=$(gcloud run services describe "$SERVICE_NAME" --project "$PROJECT_ID" --region "$REGION" --format=json)
+          url=$(printf '%s' "$service_json" | jq -r --arg tag "$CANDIDATE_TAG" '.status.traffic[] | select(.tag == $tag) | .url')
+          revision=$(printf '%s' "$service_json" | jq -r --arg tag "$CANDIDATE_TAG" '.status.traffic[] | select(.tag == $tag) | .revisionName')
+          if [ -z "$url" ] || [ "$url" = "null" ] || [ -z "$revision" ] || [ "$revision" = "null" ]; then
+            echo "Could not resolve tagged candidate revision" >&2
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke-test candidate directly
+        env:
+          CANDIDATE_URL: ${{ steps.candidate.outputs.url }}
+        run: |
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent "${CANDIDATE_URL}/api/health" >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Candidate failed health check. Existing production traffic was not changed." >&2
+          exit 1
+
+      - name: Promote candidate to 100 percent
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          REVISION: ${{ steps.candidate.outputs.revision }}
+          CANDIDATE_TAG: ${{ steps.image.outputs.candidate }}
+        run: |
+          gcloud run services update-traffic "$SERVICE_NAME" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions "${REVISION}=100" \
+            --quiet
+          gcloud run services update-traffic "$SERVICE_NAME" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --remove-tags "$CANDIDATE_TAG" \
+            --quiet
+
+      - name: Verify public production endpoint
         id: service
         env:
           PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
           url=$(gcloud run services describe "$SERVICE_NAME" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')
           revision=$(gcloud run services describe "$SERVICE_NAME" --project "$PROJECT_ID" --region "$REGION" --format='value(status.latestReadyRevisionName)')
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
-          echo "Deployed revision: $revision"
-          echo "Service URL: $url"
-
-      - name: Production health smoke test
-        env:
-          SERVICE_URL: ${{ steps.service.outputs.url }}
-        run: |
           for attempt in $(seq 1 20); do
-            if curl --fail --silent "${SERVICE_URL}/api/health" >/dev/null; then
+            if curl --fail --silent "${url}/api/health" >/dev/null; then
+              echo "url=$url" >> "$GITHUB_OUTPUT"
+              echo "revision=$revision" >> "$GITHUB_OUTPUT"
+              echo "Deployed revision: $revision"
+              echo "Service URL: $url"
               exit 0
             fi
             sleep 3
