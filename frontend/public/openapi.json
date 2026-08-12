@@ -1,0 +1,145 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "milloin REST API",
+    "description": "Agent-native REST API for milloin meeting poll scheduler.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://milloin-api.ottobecker.workers.dev/api",
+      "description": "Production Cloudflare Worker API"
+    },
+    {
+      "url": "http://127.0.0.1:8787/api",
+      "description": "Local Dev API"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "operationId": "getHealth",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/polls": {
+      "post": {
+        "summary": "Create a new meeting poll",
+        "operationId": "createPoll",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "options"],
+                "properties": {
+                  "title": { "type": "string", "example": "Projektipalaveri" },
+                  "description": { "type": "string", "example": "Aikaehdotukset viikolle 34" },
+                  "options": {
+                    "type": "array",
+                    "items": { "type": "string", "example": "Pe 14.8. klo 14:00" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Poll created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "pollId": { "type": "string" },
+                    "adminToken": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/polls/{id}": {
+      "get": {
+        "summary": "Get poll details and vote matrix",
+        "operationId": "getPoll",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Poll matrix data" }
+        }
+      }
+    },
+    "/polls/{id}/vote": {
+      "post": {
+        "summary": "Submit or update voter availability",
+        "operationId": "submitVote",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["voterName", "votes"],
+                "properties": {
+                  "voterName": { "type": "string", "example": "Matti Meikäläinen" },
+                  "voterToken": { "type": "string" },
+                  "votes": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": ["yes", "no", "maybe"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Vote saved" }
+        }
+      }
+    },
+    "/polls/{id}/lock": {
+      "post": {
+        "summary": "Lock poll or set final option (Requires Admin Token)",
+        "operationId": "lockPoll",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "X-Admin-Token", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["isClosed"],
+                "properties": {
+                  "isClosed": { "type": "boolean" },
+                  "finalOptionId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Poll lock status updated" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "milloin",
+  "name_for_model": "milloin_scheduler",
+  "description_for_human": "Kevyt ja ilmainen aikaehdotustyökalu. Ei kirjautumista.",
+  "description_for_model": "Plugin allowing AI agents to create polls, submit time availability, retrieve poll results, and select winning meeting times for users without requiring accounts.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://beckot.github.io/milloin/openapi.json"
+  },
+  "logo_url": "https://beckot.github.io/milloin/logo.jpg",
+  "contact_email": "otto.becker@digia.com",
+  "legal_info_url": "https://beckot.github.io/milloin/"
+}

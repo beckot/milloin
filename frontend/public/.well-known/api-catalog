@@ -1,0 +1,14 @@
+{
+  "link-set": [
+    {
+      "anchor": "https://beckot.github.io/milloin/api/v1",
+      "service": [
+        {
+          "href": "https://beckot.github.io/milloin/openapi.json",
+          "type": "application/openapi+json",
+          "title": "milloin REST API Specification"
+        }
+      ]
+    }
+  ]
+}

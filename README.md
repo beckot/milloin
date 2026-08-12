@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./logo.jpg" alt="milloin logo" width="140" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
+  <img src="./logo.jpg" alt="milloin logo" width="220" style="border-radius: 24px; box-shadow: 0 12px 36px rgba(0,0,0,0.6);" />
   
   # milloin.fi
 
@@ -7,8 +7,8 @@
 
   [![GitHub License](https://img.shields.io/github/license/beckot/milloin?style=flat-square)](./LICENSE)
   [![GitHub Pages](https://img.shields.io/github/deployments/beckot/milloin/github-pages?label=GitHub%20Pages&style=flat-square)](https://beckot.github.io/milloin/)
+  [![Agent-Native](https://img.shields.io/badge/Agent--Native-OpenAPI%20%7C%20MCP-06b6d4?style=flat-square)](./frontend/public/openapi.json)
   [![TypeScript](https://img.shields.io/badge/TypeScript-Worker%20API-blue?style=flat-square)](./worker)
-  [![Vite](https://img.shields.io/badge/Vite-Frontend-646CFF?style=flat-square)](./frontend)
 
 </div>
 
@@ -25,6 +25,18 @@ Doodle on suosittu, mutta maksullinen, täynnä mainoksia ja vaatii usein kirjau
 
 ---
 
+## 🤖 AI Agent Discovery & Agent-Native Pattern
+
+**milloin** on rakennettu alusta alkaen **Agent-Native** -periaatteella. AI-agentit (kuten Claude, Codex, Antigravity ja muut LLM-pohjaiset avustajat) voivat löytää ja käyttää sovellusta ohjelmallisesti ilman näytönkaapimista (screen scraping):
+
+| Löydettävyystiedosto | Standardi / Formaatti | Käyttötarkoitus |
+| :--- | :--- | :--- |
+| `/.well-known/ai-plugin.json` | OpenAI Plugin Manifest | Mahdollistaa AI-agenttien kyselyiden luonnin ja äänestyksen. |
+| `/.well-known/api-catalog` | RFC 9340 API Catalog | Koneellinen rajapintalöydettävyys hakukoneille ja agenteille. |
+| `/openapi.json` | OpenAPI 3.0 Specification | Täysi koneellinen REST-rajapintakuvaus kaikkine parametreineen. |
+
+---
+
 ## 🛠️ Sovellusarkkitehtuuri
 
 ```
@@ -32,6 +44,7 @@ Doodle on suosittu, mutta maksullinen, täynnä mainoksia ja vaatii usein kirjau
 |                  GitHub Pages (Static Web UI)                     |
 |  - Moderni lasimorfismiteema (Dark Mode)                          |
 |  - Suomenkielinen käyttöliittymä (Europe/Helsinki aikavyöhyke)    |
+|  - Agenttijohtoiset löydettävyys-meta-tagit (OpenAPI/MCP)         |
 |  - In-Memory & LocalStorage automaattinen varatila                 |
 +---------------------------------+---------------------------------+
                                   |
