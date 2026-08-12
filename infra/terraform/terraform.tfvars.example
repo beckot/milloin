@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars for local apply. Do not commit terraform.tfvars.
+project_id = "your-globally-unique-gcp-project-id"
+region     = "europe-north1"
+
+# Personal service cost guardrail.
+max_instances = 3
