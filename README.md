@@ -1,147 +1,42 @@
 <div align="center">
-  <img src="./logo.jpg" alt="milloin logo" width="220" style="border-radius: 24px; box-shadow: 0 12px 36px rgba(0,0,0,0.6);" />
+  <img src="./logo.jpg" alt="milloin logo" width="200" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
   
   # milloin.fi
 
-  **Kevyt, ilmainen ja nopea aikaehdotusten sopimistyökalu ilman kirjautumista.**
+  **Sopiva aika helposti ilman kirjautumista.**
 
-  [![GitHub License](https://img.shields.io/github/license/beckot/milloin?style=flat-square)](./LICENSE)
-  [![GitHub Pages](https://img.shields.io/github/deployments/beckot/milloin/github-pages?label=GitHub%20Pages&style=flat-square)](https://beckot.github.io/milloin/)
-  [![Agent-Native](https://img.shields.io/badge/Agent--Native-OpenAPI%20%7C%20MCP-06b6d4?style=flat-square)](./frontend/public/openapi.json)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-Worker%20API-blue?style=flat-square)](./worker)
-
+  [![Live App](https://img.shields.io/badge/Käytä%20sovellusta-beckot.github.io%2Fmilloin-06b6d4?style=for-the-badge)](https://beckot.github.io/milloin/)
 </div>
 
 ---
 
-## 💡 Miksi milloin?
+## 📌 Mikä milloin on?
 
-Doodle on suosittu, mutta maksullinen, täynnä mainoksia ja vaatii usein kirjautumisen. **milloin** on suomalaiseen makuun suunniteltu yksinkertainen vaihtoehto:
+**milloin** on henkilökohtaiseen ja tiimikäyttöön tehty kevyt aikaehdotusten sopimistyökalu. Doodle on hyvä, mutta nykyisin raskas, täynnä mainoksia ja vaatii usein kirjautumisen. **milloin** tekee vain yhden asian ja tekee sen nopeasti:
 
-- **Ei kirjautumista**: Luo kysely sekunneissa ilman tunnuksia.
-- **Yksityinen & Maksuton**: Ei mainoksia, evästehuijauksia tai tiedonkeruuta.
-- **Automatisoitu yhteenveto**: Näet yhdellä silmäyksellä suosituimman ajan.
-- **Kaksivaiheinen tila**: Mukana valinnainen paikallistilan automaattinen varajärjestelmä (Offline Local Storage Fallback), joten sovellus toimii heti ilman palvelinasennustakin.
-
----
-
-## 🤖 AI Agent Discovery & Agent-Native Pattern
-
-**milloin** on rakennettu alusta alkaen **Agent-Native** -periaatteella. AI-agentit (kuten Claude, Codex, Antigravity ja muut LLM-pohjaiset avustajat) voivat löytää ja käyttää sovellusta ohjelmallisesti ilman näytönkaapimista (screen scraping):
-
-| Löydettävyystiedosto | Standardi / Formaatti | Käyttötarkoitus |
-| :--- | :--- | :--- |
-| `/.well-known/ai-plugin.json` | OpenAI Plugin Manifest | Mahdollistaa AI-agenttien kyselyiden luonnin ja äänestyksen. |
-| `/.well-known/api-catalog` | RFC 9340 API Catalog | Koneellinen rajapintalöydettävyys hakukoneille ja agenteille. |
-| `/openapi.json` | OpenAPI 3.0 Specification | Täysi koneellinen REST-rajapintakuvaus kaikkine parametreineen. |
+1. **Luo kysely**: Anna otsikko ja ehdota muutamaa aikaa.
+2. **Jaa julkinen linkki**: Lähetä linkki osallistujille — ei kirjautumista vastaajille.
+3. **Katso tulos**: Suosituin aika näkyy reaaliajassa yhteenvedossa.
 
 ---
 
-## 🛠️ Sovellusarkkitehtuuri
+## ✨ Tärkeimmät ominaisuudet
 
-```
-+-------------------------------------------------------------------+
-|                  GitHub Pages (Static Web UI)                     |
-|  - Moderni lasimorfismiteema (Dark Mode)                          |
-|  - Suomenkielinen käyttöliittymä (Europe/Helsinki aikavyöhyke)    |
-|  - Agenttijohtoiset löydettävyys-meta-tagit (OpenAPI/MCP)         |
-|  - In-Memory & LocalStorage automaattinen varatila                 |
-+---------------------------------+---------------------------------+
-                                  |
-                           HTTPS REST API
-                                  |
-                                  v
-+-------------------------------------------------------------------+
-|               Cloudflare Worker (Serverless API)                  |
-|  - Hono REST Framework (TypeScript)                               |
-|  - Cloudflare Turnstile -näkemätön bot- ja spamsuojaus            |
-|  - Luojan hallintatunnistimen (Admin Token) tarkistus             |
-+---------------------------------+---------------------------------+
-                                  |
-                                  v
-+-------------------------------------------------------------------+
-|               Cloudflare D1 (Relational SQLite DB)                |
-|  - Kyselyt, aikaehdotukset, osallistujat ja sopivuusäänet        |
-+-------------------------------------------------------------------+
-```
+- 🚀 **100% Maksuton & Mainokseton**: Ei evästehuijauksia, mainoksia tai rekisteröitymistä.
+- 🇫🇮 **Suomalaiseen makuun**: Aikavyöhyke `Europe/Helsinki`, selkeä suomenkielinen käyttöliittymä.
+- 📱 **Toimii kaikilla laitteilla**: Responsiivinen näkymä puhelimelle ja tietokoneelle.
+- 🛡️ **Spam-suojattu**: Sisäänrakennettu automaattinen bot- ja spamsuojaus.
+- 🔑 **Ylläpitäjän hallinta**: Kyselyn luoja saa admin-avaimen, jolla äänestyksen voi lukita kun sopiva aika on valittu.
+- 🤖 **Agent-Native**: AI-avustajat ja agentit voivat luoda ja lukea kyselyitä ohjelmallisesti (OpenAPI & MCP).
 
 ---
 
-## 🚀 Kehittäjän pika-aloitus (Local Dev)
+## 🛠️ Kehitys ja taustajärjestelmä
 
-### Esivaatimukset
-- **Node.js**: v18.0 tai uudempi
-- **npm**: v9.0 tai uudempi
+Tämä repositorio sisältää sovelluksen lähdekoodin:
 
-### 1. Käynnistä frontend (Vite)
-
-```bash
-# Siirry frontend-hakemistoon
-cd frontend
-
-# Asenna riippuvuudet
-npm install
-
-# Käynnistä kehityspalvelin (http://localhost:5173/milloin/)
-npm run dev
-```
-
-> **Vinkki:** Frontend sisältää automaattisen *Local Storage Fallback* -tilan, joten voit luoda kyselyitä ja äänestää välittömästi ilman taustapalvelinta.
-
-### 2. Käynnistä backend-palvelin (Cloudflare Worker API)
-
-```bash
-# Siirry worker-hakemistoon toisessa terminaalissa
-cd worker
-
-# Asenna riippuvuudet
-npm install
-
-# Käynnistä paikallinen Cloudflare Worker + paikallinen D1 SQLite -tietokanta
-npm run dev
-```
-
-Kehityspalvelin käynnistyy osoitteeseen `http://127.0.0.1:8787`.
-
----
-
-## 🧪 Kääntäminen ja tyyppitarkistus
-
-Testaa sekä käyttöliittymän että taustapalvelimen virheettömyys ennen sitomista (commit):
-
-```bash
-# 1. Käännä frontend tuotantoversioon
-cd frontend
-npm run build
-
-# 2. Tarkista Workerin TypeScript-tyypit
-cd ../worker
-npx tsc --noEmit
-```
-
----
-
-## 🌐 Tuotantojulkaisu (GitHub Pages & Cloudflare)
-
-### Frontend (GitHub Pages)
-1. Avaa GitHub-repositorio: [github.com/beckot/milloin](https://github.com/beckot/milloin)
-2. Siirry kohtaan **Settings** -> **Pages**.
-3. Valitse **Source** -> **GitHub Actions**.
-4. Aina kun koodi työnnetään `main`-haaraan, `.github/workflows/deploy-frontend.yml` rakentaa ja julkaisee sivuston automaattisesti osoitteeseen `https://beckot.github.io/milloin/`.
-
-### Backend (Cloudflare Worker & D1)
-1. Luo ilmainen D1-tietokanta Cloudflaressa:
-   ```bash
-   cd worker
-   npx wrangler login
-   npx wrangler d1 create milloin-db
-   ```
-2. Päivitä luotu `database_id` tiedostoon [`worker/wrangler.jsonc`](file:///C:/Users/otbecker/dev/milloin/worker/wrangler.jsonc).
-3. Aja tietokantamigraatio ja julkaise rajapinta:
-   ```bash
-   npx wrangler d1 execute milloin-db --file=./schema.sql
-   npx wrangler deploy
-   ```
+- **Frontend**: Single Page App ([`frontend/`](./frontend)), isännöity GitHub Pagesissa.
+- **Backend API**: Serverless REST API ([`worker/`](./worker)), pyörii Cloudflare Workerissä D1 SQLite -tietokannalla.
 
 ---
 
