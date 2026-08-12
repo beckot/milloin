@@ -3,30 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Milloin? — Sopiva aika helposti ilman kirjautumista</title>
-  <meta name="description" content="Luo kysely, ehdota aikoja ja löydä kaikille sopiva tapaaminen nopeasti ilman mainoksia tai kirjautumista.">
+  <title>milloin — Valitse sopivat päivämäärät</title>
+  <meta name="description" content="Selkeä ja konstailematon päivämäärien sopimistyökalu. Valitse päivät kalenterista ja jaa linkki.">
   <meta name="ai-agent-support" content="enabled, openapi, mcp, rest">
   <link rel="api-catalog" href="./.well-known/api-catalog">
   <link rel="openapi" type="application/openapi+json" href="./openapi.json">
   <link rel="ai-plugin" type="application/json" href="./.well-known/ai-plugin.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./src/style.css">
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
   <div id="app" class="app-container">
-    <!-- Top Header -->
+    <!-- Header -->
     <header class="main-header">
       <div class="header-inner">
         <a href="#/new" id="logo-link" class="brand-logo">
-          <img src="./logo.jpg" alt="milloin logo" class="logo-img" style="height: 48px; width: 48px; border-radius: 10px; object-fit: cover;">
-          <span class="logo-text">milloin<span class="logo-dot">.fi</span></span>
+          <img src="./logo.jpg" alt="milloin logo" class="logo-img">
+          <span class="logo-text">milloin</span>
         </a>
         <div class="header-actions">
           <a href="#/new" id="btn-header-new-poll" class="btn btn-secondary btn-sm">
-            <span>+ Luo kysely</span>
+            <span>+ Uusi kysely</span>
           </a>
         </div>
       </div>
@@ -38,44 +38,69 @@
       <!-- VIEW 1: CREATE POLL -->
       <section id="view-create" class="view-panel active">
         <div class="hero-section">
-          <span class="badge badge-accent">100% Ilmainen & Yksityinen</span>
-          <h1 class="hero-title">Löydä kaikille sopiva aika hetkessä</h1>
-          <p class="hero-sub">Ehdota muutamaa aikaa, jaa linkki osallistujille ja katso tulokset reaaliajassa. Ei rekisteröitymistä.</p>
+          <h1 class="hero-title">Milloin tavataan?</h1>
+          <p class="hero-sub">Klikkaa sopivat päivämäärät kalenterista, jaa linkki ja katso mikä päivä sopii kaikille.</p>
         </div>
 
         <div class="card form-card">
           <form id="poll-create-form" autocomplete="off">
             <div class="form-group">
-              <label for="poll-title" class="form-label">Kyselyn otsikko <span class="required">*</span></label>
-              <input type="text" id="poll-title" class="form-input" placeholder="esim. Projektipalaveri, Kahvitauko tai Lounas" required maxlength="120">
+              <label for="poll-title" class="form-label">Mitä järjestetään? <span class="required">*</span></label>
+              <input type="text" id="poll-title" class="form-input" placeholder="esim. Tiimin kehityspäivä, Illallinen tai Mökkeily" required maxlength="120">
             </div>
 
             <div class="form-group">
-              <label for="poll-desc" class="form-label">Kuvaus tai lisätiedot (valinnainen)</label>
-              <textarea id="poll-desc" class="form-input form-textarea" placeholder="esim. Agendana käydä läpi ensi viikon aikataulu ja tehtävät" rows="2" maxlength="300"></textarea>
+              <label for="poll-desc" class="form-label">Kuvaus tai muistiinpanot (valinnainen)</label>
+              <textarea id="poll-desc" class="form-input form-textarea" placeholder="esim. Katsotaan päivä joka sopii mahdollisimman monelle" rows="2" maxlength="300"></textarea>
             </div>
 
+            <!-- VISUAL CALENDAR PICKER -->
             <div class="form-group">
               <div class="label-row">
-                <label class="form-label">Aikaehdotukset <span class="required">*</span></label>
-                <span class="label-hint">Syötä pvm & klo</span>
-              </div>
-              
-              <!-- Quick Time Preset Helpers -->
-              <div class="presets-row">
-                <span class="preset-label">Pikalisäys:</span>
-                <button type="button" class="btn-chip" id="btn-add-tomorrow-10">Huomenna 10:00</button>
-                <button type="button" class="btn-chip" id="btn-add-tomorrow-14">Huomenna 14:00</button>
-                <button type="button" class="btn-chip" id="btn-add-nextweek-10">Ensi ma 10:00</button>
+                <label class="form-label">Valitse ehdotettavat päivämäärät <span class="required">*</span></label>
+                <span class="label-hint" id="selected-dates-count">0 päivää valittu</span>
               </div>
 
-              <div id="options-list" class="options-list">
-                <!-- Option inputs rendered dynamically -->
+              <div class="calendar-widget-card">
+                <div class="calendar-header">
+                  <button type="button" id="cal-prev-month" class="btn-cal-nav">‹</button>
+                  <span id="cal-month-label" class="cal-month-title">Elokuu 2026</span>
+                  <button type="button" id="cal-next-month" class="btn-cal-nav">›</button>
+                </div>
+                
+                <div class="calendar-weekdays">
+                  <span>Ma</span><span>Ti</span><span>Ke</span><span>To</span><span>Pe</span><span>La</span><span>Su</span>
+                </div>
+
+                <div id="calendar-days-grid" class="calendar-days-grid">
+                  <!-- Dynamic Calendar Days Injected Here -->
+                </div>
               </div>
 
-              <button type="button" id="btn-add-option" class="btn btn-ghost btn-add-row">
-                <span>+ Lisää aikaehdotus</span>
-              </button>
+              <!-- Selected Dates Chips Display -->
+              <div id="selected-dates-list" class="selected-dates-chips">
+                <span class="empty-dates-hint">Klikkaa päiviä yllä olevasta kalenterista ehdottaaksesi niitä.</span>
+              </div>
+            </div>
+
+            <!-- Optional Email Notification -->
+            <div class="form-group border-top-dashed pt-4">
+              <label for="owner-email" class="form-label">Sähköposti raportteja varten (valinnainen)</label>
+              <input type="email" id="owner-email" class="form-input" placeholder="sinu.sahkoposti@esimerkki.fi">
+              <span class="form-help-text">Saat sähköpostiisi yhteenvedon kun ihmiset vastaavat.</span>
+            </div>
+
+            <!-- Optional Passcode Protection -->
+            <div class="form-group">
+              <label for="creator-passcode" class="form-label">Suojaa kyselyn muokkaus salasanalla (valinnainen)</label>
+              <input type="password" id="creator-passcode" class="form-input" placeholder="Syötä valinnainen salasana">
+              <span class="form-help-text">Vain salasanan tietävät voivat lukita tai muokata kyselyä myöhemmin.</span>
+            </div>
+
+            <!-- Self-Destruct Lifecycle Policy Notice -->
+            <div class="policy-notice-box">
+              <span class="notice-icon">♻️</span>
+              <span class="notice-text">Yksityisyyden suojaamiseksi tämä kysely ja kaikki vastaukset poistuvat automaattisesti <strong>3 kuukauden kuluttua</strong>.</span>
             </div>
 
             <!-- Anti-Spam Turnstile Widget -->
@@ -98,6 +123,7 @@
         <div id="poll-header-card" class="card poll-header-card">
           <div class="poll-badge-row">
             <span id="poll-status-badge" class="badge badge-success">Avoinna</span>
+            <span id="poll-expires-badge" class="badge badge-warning">Poistuu 90 vrk kuluttua</span>
             <span id="poll-created-at" class="poll-meta-date">Luotu...</span>
           </div>
           <h1 id="poll-display-title" class="poll-title">Ladataan kyselyä...</h1>
@@ -105,9 +131,9 @@
 
           <!-- Top Winner Announcement Banner -->
           <div id="winner-banner" class="winner-banner hidden">
-            <div class="winner-icon">🏆</div>
+            <div class="winner-icon">🌿</div>
             <div class="winner-info">
-              <span class="winner-label">Suosituin aika</span>
+              <span class="winner-label">Suosituin päivä</span>
               <span id="winner-text" class="winner-time">-</span>
             </div>
           </div>
@@ -128,7 +154,7 @@
           <!-- Admin Notice if Admin Token is present -->
           <div id="admin-banner" class="admin-banner hidden">
             <span class="admin-icon">🔑</span>
-            <span class="admin-text">Olet tämän kyselyn luoja. Voit lukita äänestyksen tai valita lopullisen ajan.</span>
+            <span class="admin-text">Olet tämän kyselyn hallinnoija. Voit lukita äänestyksen tai valita lopullisen päivän.</span>
             <button type="button" id="btn-toggle-lock" class="btn btn-sm btn-outline-danger">Sulje kysely</button>
           </div>
         </div>
@@ -136,7 +162,7 @@
         <!-- Voting Grid Matrix Card -->
         <div class="card grid-card">
           <div class="grid-card-header">
-            <h2>Vastausten yhteenveto & äänestys</h2>
+            <h2>Päivien sopivuus & äänestys</h2>
             <span id="voter-count-tag" class="badge badge-neutral">0 vastausta</span>
           </div>
 
@@ -146,11 +172,11 @@
 
           <!-- Submit Vote Form -->
           <div id="vote-form-container" class="vote-form-box">
-            <h3 id="vote-form-title">Ilmoita oma sopivuutesi</h3>
+            <h3 id="vote-form-title">Ilmoita mille päiville pääset</h3>
             <form id="vote-submit-form">
               <div class="form-group">
                 <label for="voter-name" class="form-label">Nimesi <span class="required">*</span></label>
-                <input type="text" id="voter-name" class="form-input" placeholder="esim. Matti Meikäläinen" required maxlength="60">
+                <input type="text" id="voter-name" class="form-input" placeholder="esim. Matti" required maxlength="60">
               </div>
 
               <div id="vote-options-selectors" class="vote-options-list">
@@ -175,9 +201,9 @@
       <!-- VIEW 3: NOT FOUND / ERROR -->
       <section id="view-not-found" class="view-panel text-center">
         <div class="card empty-card">
-          <div class="empty-icon">🔍</div>
+          <div class="empty-icon">🍂</div>
           <h2>Kyselyä ei löytynyt</h2>
-          <p>Tarkista linkki tai luo uusi kysely alla olevasta painikkeesta.</p>
+          <p>Kysely on saatettu poistaa tai se on vanhentunut (3 kk säilytysaika).</p>
           <a href="#/new" class="btn btn-primary">Luo uusi kysely</a>
         </div>
       </section>
@@ -187,8 +213,8 @@
     <!-- Footer -->
     <footer class="main-footer">
       <div class="footer-inner">
-        <p>© 2026 milloin.fi — Kevyt & maksuton aikaehdotustyökalu</p>
-        <p class="footer-sub">Suomalaiseen makuun. Ei evästekyselyitä eikä mainosseurantaa.</p>
+        <p>© 2026 milloin — Yksinkertainen & maksuton päivämäärien valinta</p>
+        <p class="footer-sub">Ei evästeitä, ei seurantaa. Kyselyt poistuvat automaattisesti 3 kuukauden kuluttua.</p>
       </div>
     </footer>
   </div>

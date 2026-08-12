@@ -1,13 +1,12 @@
-// Milloin Client Application Logic (with Live API + Local Fallback Support)
+// milloin — Plain, Rustic Meeting Date Scheduler Logic
 
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://127.0.0.1:8787/api'
   : 'https://milloin-api.ottobecker.workers.dev/api';
 
-// Local storage key for offline/fallback mock database
 const LOCAL_STORE_KEY = 'milloin_local_db';
 
-// State management
+// State Management
 const state = {
   currentView: 'create',
   currentPoll: null,
@@ -18,7 +17,12 @@ const state = {
   activeVotes: {},
 };
 
-// Local Storage Mock DB Helper (ensures app works instantly even without Cloudflare worker)
+// Visual Calendar State
+const calendarState = {
+  currentDate: new Date(),
+  selectedDates: new Set(), // Set of YYYY-MM-DD strings
+};
+
 function getLocalDb() {
   return JSON.parse(localStorage.getItem(LOCAL_STORE_KEY) || '{"polls":{}, "options":{}, "voters":{}, "votes":{}}');
 }
@@ -27,14 +31,18 @@ function saveLocalDb(db) {
   localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(db));
 }
 
-// DOM ELEMENTS
+// DOM Elements
 const viewCreate = document.getElementById('view-create');
 const viewPoll = document.getElementById('view-poll');
 const viewNotFound = document.getElementById('view-not-found');
 
 const pollCreateForm = document.getElementById('poll-create-form');
-const optionsList = document.getElementById('options-list');
-const btnAddOption = document.getElementById('btn-add-option');
+const calendarDaysGrid = document.getElementById('calendar-days-grid');
+const calMonthLabel = document.getElementById('cal-month-label');
+const btnCalPrev = document.getElementById('cal-prev-month');
+const btnCalNext = document.getElementById('cal-next-month');
+const selectedDatesList = document.getElementById('selected-dates-list');
+const selectedDatesCount = document.getElementById('selected-dates-count');
 
 const voteSubmitForm = document.getElementById('vote-submit-form');
 const voteOptionsSelectors = document.getElementById('vote-options-selectors');
@@ -42,7 +50,6 @@ const votingGridContainer = document.getElementById('voting-grid-container');
 
 const shareUrlInput = document.getElementById('share-url-input');
 const btnCopyLink = document.getElementById('btn-copy-link');
-
 const adminBanner = document.getElementById('admin-banner');
 const btnToggleLock = document.getElementById('btn-toggle-lock');
 
@@ -57,81 +64,131 @@ function showToast(message, type = 'info') {
   setTimeout(() => { toast.remove(); }, 4000);
 }
 
-function formatDateFinnish(dateObj) {
+function formatFinnishDateString(dateObj) {
   const days = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La'];
+  const months = ['tammikuuta', 'helmikuuta', 'maaliskuuta', 'huhtikuuta', 'toukokuuta', 'kesäkuuta', 'heinäkuuta', 'elokuuta', 'syyskuuta', 'lokakuuta', 'marraskuuta', 'joulukuuta'];
   const dayName = days[dateObj.getDay()];
-  const dateStr = dateObj.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' });
-  const timeStr = dateObj.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
-  return `${dayName} ${dateStr} klo ${timeStr}`;
+  const dayNum = dateObj.getDate();
+  const monthName = months[dateObj.getMonth()];
+  return `${dayName} ${dayNum}. ${monthName}`;
+}
+
+function formatDateISO(dateObj) {
+  const yyyy = dateObj.getFullYear();
+  const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(dateObj.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function generateId(len = 10) {
   return Math.random().toString(36).substring(2, 2 + len);
 }
 
-// OPTION ROW MANAGEMENT IN CREATE FORM
-function createOptionRowValue(initialValue = '') {
-  const row = document.createElement('div');
-  row.className = 'option-row';
+// VISUAL CALENDAR PICKER LOGIC
+function renderCalendar() {
+  if (!calendarDaysGrid || !calMonthLabel) return;
 
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'form-input option-input';
-  input.placeholder = 'esim. Pe 14.8. klo 14:00';
-  input.value = initialValue;
-  input.required = true;
+  const year = calendarState.currentDate.getFullYear();
+  const month = calendarState.currentDate.getMonth();
 
-  const removeBtn = document.createElement('button');
-  removeBtn.type = 'button';
-  removeBtn.className = 'btn-remove-row';
-  removeBtn.innerHTML = '✕';
-  removeBtn.title = 'Poista rivi';
-  removeBtn.addEventListener('click', () => {
-    if (optionsList.children.length > 1) {
-      row.remove();
+  const monthNames = ['Tammikuu', 'Helmikuu', 'Maaliskuu', 'Huhtikuu', 'Toukokuu', 'Kesäkuu', 'Heinäkuu', 'Elokuu', 'Syyskuu', 'Lokakuu', 'Marraskuu', 'Joulukuu'];
+  calMonthLabel.textContent = `${monthNames[month]} ${year}`;
+
+  calendarDaysGrid.innerHTML = '';
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+
+  // Finnish week starts on Monday (0 = Mon, 6 = Sun)
+  let startingDayOfWeek = firstDay.getDay() - 1;
+  if (startingDayOfWeek === -1) startingDayOfWeek = 6;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Fill empty cells for days before the 1st
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    const emptyCell = document.createElement('div');
+    emptyCell.className = 'cal-day-cell is-empty';
+    calendarDaysGrid.appendChild(emptyCell);
+  }
+
+  // Render month days
+  for (let day = 1; day <= lastDay.getDate(); day++) {
+    const cellDate = new Date(year, month, day);
+    const dateIso = formatDateISO(cellDate);
+
+    const dayCell = document.createElement('div');
+    dayCell.className = 'cal-day-cell';
+    dayCell.textContent = day;
+
+    if (cellDate < today) {
+      dayCell.classList.add('is-past');
     } else {
-      showToast('Kyselyssä on oltava vähintään yksi aikaehdotus', 'error');
+      if (calendarState.selectedDates.has(dateIso)) {
+        dayCell.classList.add('is-selected');
+      }
+
+      dayCell.addEventListener('click', () => {
+        if (calendarState.selectedDates.has(dateIso)) {
+          calendarState.selectedDates.delete(dateIso);
+        } else {
+          calendarState.selectedDates.add(dateIso);
+        }
+        renderCalendar();
+        renderSelectedDateChips();
+      });
     }
+
+    calendarDaysGrid.appendChild(dayCell);
+  }
+}
+
+function renderSelectedDateChips() {
+  if (!selectedDatesList || !selectedDatesCount) return;
+
+  const dates = Array.from(calendarState.selectedDates).sort();
+  selectedDatesCount.textContent = `${dates.length} päivää valittu`;
+
+  if (dates.length === 0) {
+    selectedDatesList.innerHTML = '<span class="empty-dates-hint">Klikkaa päiviä yllä olevasta kalenterista ehdottaaksesi niitä.</span>';
+    return;
+  }
+
+  selectedDatesList.innerHTML = dates.map(dateIso => {
+    const [y, m, d] = dateIso.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const formatted = formatFinnishDateString(dateObj);
+    return `
+      <span class="date-chip">
+        <span>${formatted}</span>
+        <button type="button" class="btn-remove-chip" data-date="${dateIso}">✕</button>
+      </span>
+    `;
+  }).join('');
+
+  selectedDatesList.querySelectorAll('.btn-remove-chip').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dateIso = btn.dataset.date;
+      calendarState.selectedDates.delete(dateIso);
+      renderCalendar();
+      renderSelectedDateChips();
+    });
   });
-
-  row.appendChild(input);
-  row.appendChild(removeBtn);
-  optionsList.appendChild(row);
 }
 
-function initDefaultOptions() {
-  if (!optionsList) return;
-  optionsList.innerHTML = '';
-  const now = new Date();
-
-  const t10 = new Date(now); t10.setDate(t10.getDate() + 1); t10.setHours(10, 0, 0, 0);
-  const t14 = new Date(now); t14.setDate(t14.getDate() + 1); t14.setHours(14, 0, 0, 0);
-
-  createOptionRowValue(formatDateFinnish(t10));
-  createOptionRowValue(formatDateFinnish(t14));
-}
-
-document.getElementById('btn-add-tomorrow-10')?.addEventListener('click', () => {
-  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0);
-  createOptionRowValue(formatDateFinnish(d));
+btnCalPrev?.addEventListener('click', () => {
+  calendarState.currentDate.setMonth(calendarState.currentDate.getMonth() - 1);
+  renderCalendar();
 });
 
-document.getElementById('btn-add-tomorrow-14')?.addEventListener('click', () => {
-  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(14, 0, 0, 0);
-  createOptionRowValue(formatDateFinnish(d));
+btnCalNext?.addEventListener('click', () => {
+  calendarState.currentDate.setMonth(calendarState.currentDate.getMonth() + 1);
+  renderCalendar();
 });
 
-document.getElementById('btn-add-nextweek-10')?.addEventListener('click', () => {
-  const d = new Date();
-  const daysUntilNextMon = ((1 + 7 - d.getDay()) % 7) || 7;
-  d.setDate(d.getDate() + daysUntilNextMon);
-  d.setHours(10, 0, 0, 0);
-  createOptionRowValue(formatDateFinnish(d));
-});
-
-btnAddOption?.addEventListener('click', () => createOptionRowValue(''));
-
-// ROUTER & VIEW SWITCHING
+// ROUTER & NAVIGATION
 function navigate() {
   const hash = window.location.hash || '#/new';
 
@@ -151,7 +208,9 @@ function showView(viewName) {
 
   if (viewName === 'create') {
     viewCreate?.classList.add('active');
-    initDefaultOptions();
+    calendarState.selectedDates.clear();
+    renderCalendar();
+    renderSelectedDateChips();
   } else if (viewName === 'poll') {
     viewPoll?.classList.add('active');
   } else {
@@ -162,19 +221,26 @@ function showView(viewName) {
 window.addEventListener('hashchange', navigate);
 window.addEventListener('DOMContentLoaded', navigate);
 
-// CREATE POLL SUBMISSION (Try API -> Fallback to Local Storage)
+// POLL CREATION HANDLER
 pollCreateForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const title = document.getElementById('poll-title').value.trim();
   const description = document.getElementById('poll-desc').value.trim();
-  const optionInputs = Array.from(document.querySelectorAll('.option-input'));
-  const options = optionInputs.map(input => input.value.trim()).filter(val => val.length > 0);
+  const ownerEmail = document.getElementById('owner-email')?.value.trim();
+  const creatorPasscode = document.getElementById('creator-passcode')?.value.trim();
 
-  if (options.length === 0) {
-    showToast('Lisää vähintään yksi aikaehdotus', 'error');
+  const selectedDates = Array.from(calendarState.selectedDates).sort();
+  if (selectedDates.length === 0) {
+    showToast('Valitse vähintään yksi päivämäärä kalenterista', 'error');
     return;
   }
+
+  // Map dates to Finnish text options
+  const options = selectedDates.map(dateIso => {
+    const [y, m, d] = dateIso.split('-').map(Number);
+    return formatFinnishDateString(new Date(y, m - 1, d));
+  });
 
   let cfTurnstileToken = '';
   if (window.turnstile) {
@@ -192,7 +258,7 @@ pollCreateForm?.addEventListener('submit', async (e) => {
       const res = await fetch(`${API_BASE_URL}/polls`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, options, cfTurnstileToken })
+        body: JSON.stringify({ title, description, options, ownerEmail, creatorPasscode, cfTurnstileToken })
       });
       if (res.ok) {
         const data = await res.json();
@@ -202,19 +268,23 @@ pollCreateForm?.addEventListener('submit', async (e) => {
         throw new Error('API server returned error');
       }
     } catch (apiErr) {
-      console.warn('Backend API unreachable, using local storage fallback:', apiErr);
-      // Fallback local mode
+      console.warn('API unreachable, using local storage fallback:', apiErr);
       pollId = generateId(10);
-      adminToken = generateId(20);
+      adminToken = creatorPasscode || generateId(20);
 
       const db = getLocalDb();
+      const createdAt = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+
       db.polls[pollId] = {
         id: pollId,
         title,
         description,
+        ownerEmail,
         isClosed: false,
         adminToken,
-        createdAt: new Date().toISOString()
+        createdAt,
+        expiresAt
       };
 
       db.options[pollId] = options.map((optText, index) => ({
@@ -241,7 +311,7 @@ pollCreateForm?.addEventListener('submit', async (e) => {
   }
 });
 
-// LOAD AND RENDER POLL VIEW (Try API -> Fallback to Local Storage)
+// LOAD AND RENDER POLL VIEW
 async function loadPollView(pollId) {
   showView('poll');
 
@@ -255,26 +325,23 @@ async function loadPollView(pollId) {
         throw new Error('Not found on API');
       }
     } catch (apiErr) {
-      // Local Storage Fallback
       const db = getLocalDb();
       const poll = db.polls[pollId];
       if (!poll) {
         showView('not-found');
         return;
       }
-      const options = db.options[pollId] || [];
-      const voters = db.voters[pollId] || [];
-
       data = {
         poll: {
           id: poll.id,
           title: poll.title,
           description: poll.description,
           isClosed: poll.isClosed,
-          createdAt: poll.createdAt
+          createdAt: poll.createdAt,
+          expiresAt: poll.expiresAt
         },
-        options,
-        voters
+        options: db.options[pollId] || [],
+        voters: db.voters[pollId] || []
       };
     }
 
@@ -471,7 +538,7 @@ function renderVoteForm() {
   }
 }
 
-// VOTE SUBMISSION (Try API -> Fallback to Local Storage)
+// VOTE SUBMISSION
 voteSubmitForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
