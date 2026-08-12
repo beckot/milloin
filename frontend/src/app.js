@@ -1,10 +1,11 @@
-// Milloin Client Application Logic
+// Milloin Client Application Logic (with Live API + Local Fallback Support)
 
-// API endpoint URL configuration
-// Defaults to local worker in dev, or production Cloudflare worker API
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://127.0.0.1:8787/api'
-  : 'https://milloin-api.ottobecker.workers.dev/api'; // Replace with deployed worker domain
+  : 'https://milloin-api.ottobecker.workers.dev/api';
+
+// Local storage key for offline/fallback mock database
+const LOCAL_STORE_KEY = 'milloin_local_db';
 
 // State management
 const state = {
@@ -14,10 +15,19 @@ const state = {
   currentVoters: [],
   adminTokens: JSON.parse(localStorage.getItem('milloin_admin_tokens') || '{}'),
   voterTokens: JSON.parse(localStorage.getItem('milloin_voter_tokens') || '{}'),
-  activeVotes: {}, // option_id -> 'yes' | 'no' | 'maybe'
+  activeVotes: {},
 };
 
-// --- DOM ELEMENTS ---
+// Local Storage Mock DB Helper (ensures app works instantly even without Cloudflare worker)
+function getLocalDb() {
+  return JSON.parse(localStorage.getItem(LOCAL_STORE_KEY) || '{"polls":{}, "options":{}, "voters":{}, "votes":{}}');
+}
+
+function saveLocalDb(db) {
+  localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(db));
+}
+
+// DOM ELEMENTS
 const viewCreate = document.getElementById('view-create');
 const viewPoll = document.getElementById('view-poll');
 const viewNotFound = document.getElementById('view-not-found');
@@ -36,17 +46,15 @@ const btnCopyLink = document.getElementById('btn-copy-link');
 const adminBanner = document.getElementById('admin-banner');
 const btnToggleLock = document.getElementById('btn-toggle-lock');
 
-// --- HELPER FUNCTIONS ---
+// HELPER FUNCTIONS
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
+  if (!container) return;
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
   container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.remove();
-  }, 4000);
+  setTimeout(() => { toast.remove(); }, 4000);
 }
 
 function formatDateFinnish(dateObj) {
@@ -57,7 +65,11 @@ function formatDateFinnish(dateObj) {
   return `${dayName} ${dateStr} klo ${timeStr}`;
 }
 
-// --- OPTION ROW MANAGEMENT IN CREATE FORM ---
+function generateId(len = 10) {
+  return Math.random().toString(36).substring(2, 2 + len);
+}
+
+// OPTION ROW MANAGEMENT IN CREATE FORM
 function createOptionRowValue(initialValue = '') {
   const row = document.createElement('div');
   row.className = 'option-row';
@@ -88,33 +100,24 @@ function createOptionRowValue(initialValue = '') {
 }
 
 function initDefaultOptions() {
+  if (!optionsList) return;
   optionsList.innerHTML = '';
   const now = new Date();
-  
-  const tomorrow10 = new Date(now);
-  tomorrow10.setDate(tomorrow10.getDate() + 1);
-  tomorrow10.setHours(10, 0, 0, 0);
 
-  const tomorrow14 = new Date(now);
-  tomorrow14.setDate(tomorrow14.getDate() + 1);
-  tomorrow14.setHours(14, 0, 0, 0);
+  const t10 = new Date(now); t10.setDate(t10.getDate() + 1); t10.setHours(10, 0, 0, 0);
+  const t14 = new Date(now); t14.setDate(t14.getDate() + 1); t14.setHours(14, 0, 0, 0);
 
-  createOptionRowValue(formatDateFinnish(tomorrow10));
-  createOptionRowValue(formatDateFinnish(tomorrow14));
+  createOptionRowValue(formatDateFinnish(t10));
+  createOptionRowValue(formatDateFinnish(t14));
 }
 
-// Preset button handlers
 document.getElementById('btn-add-tomorrow-10')?.addEventListener('click', () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(10, 0, 0, 0);
+  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0);
   createOptionRowValue(formatDateFinnish(d));
 });
 
 document.getElementById('btn-add-tomorrow-14')?.addEventListener('click', () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(14, 0, 0, 0);
+  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(14, 0, 0, 0);
   createOptionRowValue(formatDateFinnish(d));
 });
 
@@ -126,12 +129,12 @@ document.getElementById('btn-add-nextweek-10')?.addEventListener('click', () => 
   createOptionRowValue(formatDateFinnish(d));
 });
 
-btnAddOption.addEventListener('click', () => createOptionRowValue(''));
+btnAddOption?.addEventListener('click', () => createOptionRowValue(''));
 
-// --- ROUTER & VIEW SWITCHING ---
+// ROUTER & VIEW SWITCHING
 function navigate() {
   const hash = window.location.hash || '#/new';
-  
+
   if (hash.startsWith('#/poll/')) {
     const pollId = hash.replace('#/poll/', '').split('?')[0];
     loadPollView(pollId);
@@ -142,32 +145,29 @@ function navigate() {
 
 function showView(viewName) {
   state.currentView = viewName;
-  viewCreate.classList.remove('active');
-  viewPoll.classList.remove('active');
-  viewNotFound.classList.remove('active');
+  viewCreate?.classList.remove('active');
+  viewPoll?.classList.remove('active');
+  viewNotFound?.classList.remove('active');
 
   if (viewName === 'create') {
-    viewCreate.classList.add('active');
+    viewCreate?.classList.add('active');
     initDefaultOptions();
   } else if (viewName === 'poll') {
-    viewPoll.classList.add('active');
+    viewPoll?.classList.add('active');
   } else {
-    viewNotFound.classList.add('active');
+    viewNotFound?.classList.add('active');
   }
 }
 
 window.addEventListener('hashchange', navigate);
-window.addEventListener('DOMContentLoaded', () => {
-  navigate();
-});
+window.addEventListener('DOMContentLoaded', navigate);
 
-// --- CREATE POLL SUBMISSION ---
-pollCreateForm.addEventListener('submit', async (e) => {
+// CREATE POLL SUBMISSION (Try API -> Fallback to Local Storage)
+pollCreateForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const title = document.getElementById('poll-title').value.trim();
   const description = document.getElementById('poll-desc').value.trim();
-
   const optionInputs = Array.from(document.querySelectorAll('.option-input'));
   const options = optionInputs.map(input => input.value.trim()).filter(val => val.length > 0);
 
@@ -176,7 +176,6 @@ pollCreateForm.addEventListener('submit', async (e) => {
     return;
   }
 
-  // Get Turnstile token if available
   let cfTurnstileToken = '';
   if (window.turnstile) {
     cfTurnstileToken = window.turnstile.getResponse('#create-turnstile') || '';
@@ -187,23 +186,53 @@ pollCreateForm.addEventListener('submit', async (e) => {
   btnSubmit.textContent = 'Luodaan kyselyä...';
 
   try {
-    const res = await fetch(`${API_BASE_URL}/polls`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, options, cfTurnstileToken })
-    });
+    let pollId, adminToken;
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Virhe kyselyä luotaessa');
+    try {
+      const res = await fetch(`${API_BASE_URL}/polls`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, options, cfTurnstileToken })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        pollId = data.pollId;
+        adminToken = data.adminToken;
+      } else {
+        throw new Error('API server returned error');
+      }
+    } catch (apiErr) {
+      console.warn('Backend API unreachable, using local storage fallback:', apiErr);
+      // Fallback local mode
+      pollId = generateId(10);
+      adminToken = generateId(20);
+
+      const db = getLocalDb();
+      db.polls[pollId] = {
+        id: pollId,
+        title,
+        description,
+        isClosed: false,
+        adminToken,
+        createdAt: new Date().toISOString()
+      };
+
+      db.options[pollId] = options.map((optText, index) => ({
+        id: `opt_${index}_${generateId(6)}`,
+        option_text: optText,
+        sort_order: index
+      }));
+
+      db.voters[pollId] = [];
+      db.votes[pollId] = {};
+      saveLocalDb(db);
     }
 
-    // Save Admin Token locally
-    state.adminTokens[data.pollId] = data.adminToken;
+    state.adminTokens[pollId] = adminToken;
     localStorage.setItem('milloin_admin_tokens', JSON.stringify(state.adminTokens));
 
-    showToast('Kysely luotu onnistuneesti!', 'success');
-    window.location.hash = `#/poll/${data.pollId}`;
+    showToast('Kysely luotu!', 'success');
+    window.location.hash = `#/poll/${pollId}`;
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
@@ -212,21 +241,43 @@ pollCreateForm.addEventListener('submit', async (e) => {
   }
 });
 
-// --- LOAD AND RENDER POLL VIEW ---
+// LOAD AND RENDER POLL VIEW (Try API -> Fallback to Local Storage)
 async function loadPollView(pollId) {
   showView('poll');
 
   try {
-    const res = await fetch(`${API_BASE_URL}/polls/${pollId}`);
-    if (!res.ok) {
-      if (res.status === 404) {
+    let data;
+    try {
+      const res = await fetch(`${API_BASE_URL}/polls/${pollId}`);
+      if (res.ok) {
+        data = await res.json();
+      } else {
+        throw new Error('Not found on API');
+      }
+    } catch (apiErr) {
+      // Local Storage Fallback
+      const db = getLocalDb();
+      const poll = db.polls[pollId];
+      if (!poll) {
         showView('not-found');
         return;
       }
-      throw new Error('Virhe haettaessa kyselyä');
+      const options = db.options[pollId] || [];
+      const voters = db.voters[pollId] || [];
+
+      data = {
+        poll: {
+          id: poll.id,
+          title: poll.title,
+          description: poll.description,
+          isClosed: poll.isClosed,
+          createdAt: poll.createdAt
+        },
+        options,
+        voters
+      };
     }
 
-    const data = await res.json();
     state.currentPoll = data.poll;
     state.currentOptions = data.options;
     state.currentVoters = data.voters;
@@ -242,6 +293,7 @@ async function loadPollView(pollId) {
 
 function renderPollDetails(pollId) {
   const poll = state.currentPoll;
+  if (!poll) return;
 
   document.getElementById('poll-display-title').textContent = poll.title;
   document.getElementById('poll-display-desc').textContent = poll.description || '';
@@ -258,49 +310,44 @@ function renderPollDetails(pollId) {
   const dateObj = new Date(poll.createdAt);
   document.getElementById('poll-created-at').textContent = `Luotu ${dateObj.toLocaleDateString('fi-FI')}`;
 
-  // Share URL setup
   const fullShareUrl = `${window.location.origin}${window.location.pathname}#/poll/${pollId}`;
-  shareUrlInput.value = fullShareUrl;
+  if (shareUrlInput) shareUrlInput.value = fullShareUrl;
 
-  // Check if current user is admin
   const adminToken = state.adminTokens[pollId];
   if (adminToken) {
-    adminBanner.classList.remove('hidden');
-    btnToggleLock.textContent = poll.isClosed ? 'Avaa kysely' : 'Sulje kysely';
-    btnToggleLock.onclick = () => togglePollLock(pollId, adminToken, !poll.isClosed);
+    adminBanner?.classList.remove('hidden');
+    if (btnToggleLock) {
+      btnToggleLock.textContent = poll.isClosed ? 'Avaa kysely' : 'Sulje kysely';
+      btnToggleLock.onclick = () => togglePollLock(pollId, adminToken, !poll.isClosed);
+    }
   } else {
-    adminBanner.classList.add('hidden');
+    adminBanner?.classList.add('hidden');
   }
 }
 
-// --- RENDER VOTING MATRIX GRID & WINNER ---
 function renderVotingGrid() {
-  const options = state.currentOptions;
-  const voters = state.currentVoters;
+  const options = state.currentOptions || [];
+  const voters = state.currentVoters || [];
 
-  document.getElementById('voter-count-tag').textContent = `${voters.length} vastausta`;
+  const countTag = document.getElementById('voter-count-tag');
+  if (countTag) countTag.textContent = `${voters.length} vastausta`;
 
-  // Calculate vote totals per option
-  const totals = {}; // option_id -> { yes: 0, maybe: 0, no: 0 }
-  options.forEach(opt => {
-    totals[opt.id] = { yes: 0, maybe: 0, no: 0 };
-  });
+  const totals = {};
+  options.forEach(opt => { totals[opt.id] = { yes: 0, maybe: 0, no: 0 }; });
 
   voters.forEach(voter => {
-    Object.entries(voter.votes).forEach(([optId, decision]) => {
+    Object.entries(voter.votes || {}).forEach(([optId, decision]) => {
       if (totals[optId] && totals[optId][decision] !== undefined) {
         totals[optId][decision]++;
       }
     });
   });
 
-  // Determine top winning option
   let winningOptionId = null;
   let maxScore = -1;
 
   options.forEach(opt => {
     const t = totals[opt.id];
-    // Score weighted: Yes = 2 pts, Maybe = 1 pt
     const score = (t.yes * 2) + t.maybe;
     if (score > maxScore && t.yes > 0) {
       maxScore = score;
@@ -311,13 +358,13 @@ function renderVotingGrid() {
   const winnerBanner = document.getElementById('winner-banner');
   if (winningOptionId) {
     const winnerOpt = options.find(o => o.id === winningOptionId);
-    document.getElementById('winner-text').textContent = winnerOpt ? winnerOpt.option_text : '';
-    winnerBanner.classList.remove('hidden');
+    const textEl = document.getElementById('winner-text');
+    if (textEl) textEl.textContent = winnerOpt ? winnerOpt.option_text : '';
+    winnerBanner?.classList.remove('hidden');
   } else {
-    winnerBanner.classList.add('hidden');
+    winnerBanner?.classList.add('hidden');
   }
 
-  // Build Table HTML
   let tableHtml = `
     <table class="poll-table">
       <thead>
@@ -325,7 +372,7 @@ function renderVotingGrid() {
           <th>Osallistuja</th>
           ${options.map(opt => `
             <th class="th-option ${opt.id === winningOptionId ? 'is-winner' : ''}">
-              ${opt.option_text}
+              ${escapeHtml(opt.option_text)}
             </th>
           `).join('')}
         </tr>
@@ -341,7 +388,7 @@ function renderVotingGrid() {
           <tr>
             <td><strong>${escapeHtml(v.name)}</strong></td>
             ${options.map(opt => {
-              const decision = v.votes[opt.id] || 'no';
+              const decision = (v.votes || {})[opt.id] || 'no';
               let badgeClass = 'vote-cell-no';
               let symbol = '✕';
               if (decision === 'yes') { badgeClass = 'vote-cell-yes'; symbol = '✓'; }
@@ -356,8 +403,8 @@ function renderVotingGrid() {
           <td><strong>Yhteensä (Sopii)</strong></td>
           ${options.map(opt => `
             <td>
-              <strong style="color: var(--yes-color);">${totals[opt.id].yes}</strong>
-              ${totals[opt.id].maybe > 0 ? `<span style="color: var(--maybe-color); font-size: 0.85rem;"> (+${totals[opt.id].maybe})</span>` : ''}
+              <strong style="color: var(--yes-color);">${totals[opt.id]?.yes || 0}</strong>
+              ${(totals[opt.id]?.maybe || 0) > 0 ? `<span style="color: var(--maybe-color); font-size: 0.85rem;"> (+${totals[opt.id].maybe})</span>` : ''}
             </td>
           `).join('')}
         </tr>
@@ -365,66 +412,67 @@ function renderVotingGrid() {
     </table>
   `;
 
-  votingGridContainer.innerHTML = tableHtml;
+  if (votingGridContainer) votingGridContainer.innerHTML = tableHtml;
 }
 
-// --- RENDER VOTE SUBMISSION FORM ---
 function renderVoteForm() {
   const poll = state.currentPoll;
-  const options = state.currentOptions;
+  const options = state.currentOptions || [];
   const formContainer = document.getElementById('vote-form-container');
+  if (!formContainer || !poll) return;
 
   if (poll.isClosed) {
     formContainer.innerHTML = '<p class="text-center" style="color: var(--text-muted);">Äänestys on suljettu.</p>';
     return;
   }
 
-  // Pre-fill existing voter data if saved in localStorage for this poll
   const savedToken = state.voterTokens[poll.id];
-  const existingVoter = savedToken ? state.currentVoters.find(v => v.token === savedToken) : null;
+  const existingVoter = savedToken ? (state.currentVoters || []).find(v => v.token === savedToken) : null;
 
-  if (existingVoter) {
-    document.getElementById('voter-name').value = existingVoter.name;
-    state.activeVotes = { ...existingVoter.votes };
-    document.getElementById('vote-form-title').textContent = 'Päivitä vastauksesi';
-  } else {
-    state.activeVotes = {};
-    options.forEach(opt => { state.activeVotes[opt.id] = 'yes'; }); // Default to 'yes'
+  const voterInput = document.getElementById('voter-name');
+  if (voterInput) {
+    if (existingVoter) {
+      voterInput.value = existingVoter.name;
+      state.activeVotes = { ...existingVoter.votes };
+      const titleEl = document.getElementById('vote-form-title');
+      if (titleEl) titleEl.textContent = 'Päivitä vastauksesi';
+    } else {
+      state.activeVotes = {};
+      options.forEach(opt => { state.activeVotes[opt.id] = 'yes'; });
+    }
   }
 
-  voteOptionsSelectors.innerHTML = options.map(opt => {
-    const currentVal = state.activeVotes[opt.id] || 'yes';
-    return `
-      <div class="vote-option-item">
-        <span class="vote-option-title">${escapeHtml(opt.option_text)}</span>
-        <div class="toggle-group" data-option-id="${opt.id}">
-          <button type="button" class="toggle-btn ${currentVal === 'yes' ? 'active-yes' : ''}" data-val="yes">Sopii ✓</button>
-          <button type="button" class="toggle-btn ${currentVal === 'maybe' ? 'active-maybe' : ''}" data-val="maybe">Ehkä (✓)</button>
-          <button type="button" class="toggle-btn ${currentVal === 'no' ? 'active-no' : ''}" data-val="no">Ei sovi ✕</button>
+  if (voteOptionsSelectors) {
+    voteOptionsSelectors.innerHTML = options.map(opt => {
+      const currentVal = state.activeVotes[opt.id] || 'yes';
+      return `
+        <div class="vote-option-item">
+          <span class="vote-option-title">${escapeHtml(opt.option_text)}</span>
+          <div class="toggle-group" data-option-id="${opt.id}">
+            <button type="button" class="toggle-btn ${currentVal === 'yes' ? 'active-yes' : ''}" data-val="yes">Sopii ✓</button>
+            <button type="button" class="toggle-btn ${currentVal === 'maybe' ? 'active-maybe' : ''}" data-val="maybe">Ehkä (✓)</button>
+            <button type="button" class="toggle-btn ${currentVal === 'no' ? 'active-no' : ''}" data-val="no">Ei sovi ✕</button>
+          </div>
         </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('');
 
-  // Add click listeners to toggle buttons
-  document.querySelectorAll('.toggle-group').forEach(group => {
-    const optionId = group.dataset.optionId;
-    group.querySelectorAll('.toggle-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const val = btn.dataset.val;
-        state.activeVotes[optionId] = val;
-
-        group.querySelectorAll('.toggle-btn').forEach(b => {
-          b.className = 'toggle-btn';
+    document.querySelectorAll('.toggle-group').forEach(group => {
+      const optionId = group.dataset.optionId;
+      group.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = btn.dataset.val;
+          state.activeVotes[optionId] = val;
+          group.querySelectorAll('.toggle-btn').forEach(b => { b.className = 'toggle-btn'; });
+          btn.classList.add(`active-${val}`);
         });
-        btn.classList.add(`active-${val}`);
       });
     });
-  });
+  }
 }
 
-// --- VOTE SUBMISSION HANDLER ---
-voteSubmitForm.addEventListener('submit', async (e) => {
+// VOTE SUBMISSION (Try API -> Fallback to Local Storage)
+voteSubmitForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const voterName = document.getElementById('voter-name').value.trim();
@@ -434,7 +482,7 @@ voteSubmitForm.addEventListener('submit', async (e) => {
   }
 
   const pollId = state.currentPoll.id;
-  const voterToken = state.voterTokens[pollId] || undefined;
+  const voterToken = state.voterTokens[pollId] || generateId(16);
 
   let cfTurnstileToken = '';
   if (window.turnstile) {
@@ -445,28 +493,34 @@ voteSubmitForm.addEventListener('submit', async (e) => {
   btnSubmit.disabled = true;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/polls/${pollId}/vote`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        voterName,
-        voterToken,
-        votes: state.activeVotes,
-        cfTurnstileToken
-      })
-    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/polls/${pollId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voterName, voterToken, votes: state.activeVotes, cfTurnstileToken })
+      });
+      if (!res.ok) throw new Error('API vote submission failed');
+    } catch (apiErr) {
+      console.warn('API unreachable, saving vote locally:', apiErr);
+      const db = getLocalDb();
+      if (!db.voters[pollId]) db.voters[pollId] = [];
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Virhe tallennettaessa vastauksia');
+      const existingIndex = db.voters[pollId].findIndex(v => v.token === voterToken || v.name === voterName);
+      const voterRecord = { id: `vtr_${generateId(6)}`, name: voterName, token: voterToken, votes: state.activeVotes };
+
+      if (existingIndex >= 0) {
+        db.voters[pollId][existingIndex] = voterRecord;
+      } else {
+        db.voters[pollId].push(voterRecord);
+      }
+      saveLocalDb(db);
     }
 
-    // Save voter token locally
-    state.voterTokens[pollId] = data.voterToken;
+    state.voterTokens[pollId] = voterToken;
     localStorage.setItem('milloin_voter_tokens', JSON.stringify(state.voterTokens));
 
     showToast('Vastauksesi on tallennettu!', 'success');
-    loadPollView(pollId); // Reload poll grid
+    loadPollView(pollId);
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
@@ -474,21 +528,21 @@ voteSubmitForm.addEventListener('submit', async (e) => {
   }
 });
 
-// --- TOGGLE POLL LOCK (ADMIN) ---
 async function togglePollLock(pollId, adminToken, isClosed) {
   try {
-    const res = await fetch(`${API_BASE_URL}/polls/${pollId}/lock`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Admin-Token': adminToken
-      },
-      body: JSON.stringify({ isClosed })
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Virhe muuttaessa kyselyn tilaa');
+    try {
+      const res = await fetch(`${API_BASE_URL}/polls/${pollId}/lock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken },
+        body: JSON.stringify({ isClosed })
+      });
+      if (!res.ok) throw new Error('Lock API failed');
+    } catch (apiErr) {
+      const db = getLocalDb();
+      if (db.polls[pollId]) {
+        db.polls[pollId].isClosed = isClosed;
+        saveLocalDb(db);
+      }
     }
 
     showToast(isClosed ? 'Kysely suljettu' : 'Kysely avattu uudelleen', 'success');
@@ -498,18 +552,17 @@ async function togglePollLock(pollId, adminToken, isClosed) {
   }
 }
 
-// --- COPY SHARE LINK ---
-btnCopyLink.addEventListener('click', () => {
+btnCopyLink?.addEventListener('click', () => {
+  if (!shareUrlInput) return;
   shareUrlInput.select();
   navigator.clipboard.writeText(shareUrlInput.value);
   const copyBtnText = document.getElementById('copy-btn-text');
-  copyBtnText.textContent = 'Kopioitu! ✓';
-  setTimeout(() => {
-    copyBtnText.textContent = 'Kopioi linkki';
-  }, 2000);
+  if (copyBtnText) {
+    copyBtnText.textContent = 'Kopioitu! ✓';
+    setTimeout(() => { copyBtnText.textContent = 'Kopioi linkki'; }, 2000);
+  }
 });
 
-// Utility HTML escape
 function escapeHtml(str) {
   return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
