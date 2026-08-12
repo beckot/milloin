@@ -21,6 +21,7 @@ yarn-error.log*
 **/.terraform/
 *.tfstate
 *.tfstate.*
+*.tfplan
 terraform.tfvars
 .terraform.tfstate.lock.info
 
