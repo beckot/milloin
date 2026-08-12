@@ -26,6 +26,14 @@ output "runtime_service_account" {
   value = google_service_account.runtime.email
 }
 
+output "deployment_service_account" {
+  value = google_service_account.deploy.email
+}
+
+output "github_workload_identity_provider" {
+  value = google_iam_workload_identity_pool_provider.github.name
+}
+
 output "secret_names" {
   value = { for key, secret in google_secret_manager_secret.app : key => secret.id }
 }
