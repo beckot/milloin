@@ -1,0 +1,47 @@
+name: Container CI
+
+on:
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "next.config.ts"
+      - "package.json"
+      - "public/**"
+      - ".github/workflows/container.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "next.config.ts"
+      - "package.json"
+      - "public/**"
+      - ".github/workflows/container.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production image
+        run: docker build --tag milloin:ci .
+      - name: Start container
+        run: docker run --detach --rm --name milloin-ci --publish 18080:8080 milloin:ci
+      - name: Wait for health endpoint
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs milloin-ci
+          exit 1
+      - name: Stop container
+        if: always()
+        run: docker stop milloin-ci || true
