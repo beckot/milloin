@@ -68,7 +68,7 @@ budget_currency_code = "EUR" # only if this matches the billing account
 monthly_budget_units = 10
 ```
 
-The budget alerts at 50%, 90%, and 100% current spend plus 100% forecasted spend. Eligible project-level recipients receive the budget updates.
+The budget alerts at 50%, 90%, and 100% current spend plus 100% forecasted spend. It keeps Cloud Billing's default budget notification behavior; add a custom billing notification channel later only if the default recipients are insufficient.
 
 After apply, capture these outputs:
 
