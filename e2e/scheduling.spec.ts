@@ -4,8 +4,11 @@ import { createOwnerSession } from "../src/auth/session";
 const baseURL = "http://127.0.0.1:3000";
 const secret = "0123456789abcdef0123456789abcdef";
 
-test("organizer creates poll, participant votes, organizer finalizes", async ({ context, page }) => {
-  const session = await createOwnerSession({ sub: "google-test", email: "otto@example.com", name: "Otto" }, secret);
+test("organizer creates poll, participant votes, edits, and organizer finalizes", async ({ context, page }) => {
+  const session = await createOwnerSession(
+    { sub: "google-test", email: "otto@example.com", name: "Otto" },
+    secret,
+  );
   await context.addCookies([{ name: "milloin_session", value: session, url: baseURL }]);
 
   await page.goto("/new");
@@ -23,15 +26,23 @@ test("organizer creates poll, participant votes, organizer finalizes", async ({ 
 
   await page.goto(publicUrl);
   await page.getByLabel("Nimi").fill("Anna");
-  const choices = page.getByRole("group", { name: /Saatavuus/ });
+  let choices = page.getByRole("group", { name: /Saatavuus/ });
   await choices.nth(0).getByRole("button", { name: "Kyllä" }).click();
   await choices.nth(1).getByRole("button", { name: "Ei" }).click();
   await page.getByRole("button", { name: "Tallenna vastaukset" }).click();
   await expect(page.getByText("Vastauksesi on tallennettu")).toBeVisible();
   await expect(page.getByText("Anna")).toBeVisible();
 
+  await page.getByRole("link", { name: "Tallenna tämä muokkauslinkki" }).click();
+  await expect(page).toHaveURL(/\/edit\//);
+  await page.getByLabel("Nimi").fill("Anna 2");
+  choices = page.getByRole("group", { name: /Saatavuus/ });
+  await choices.nth(1).getByRole("button", { name: "Kyllä" }).click();
+  await page.getByRole("button", { name: "Päivitä vastaukset" }).click();
+  await expect(page.getByText("Vastaukset päivitetty")).toBeVisible();
+
   await page.goto(adminUrl);
-  await expect(page.getByText("Anna")).toBeVisible();
+  await expect(page.getByText("Anna 2")).toBeVisible();
   await page.getByRole("button", { name: /Valitse voittajaksi/ }).first().click();
   await expect(page.getByText("Kysely suljettu")).toBeVisible();
 
