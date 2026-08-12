@@ -37,3 +37,41 @@ variable "max_instances" {
     error_message = "max_instances must be between 1 and 20."
   }
 }
+
+variable "operator_email" {
+  description = "Optional email notification channel for uptime incidents. Leave null until the production operator address is chosen."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "firestore_backup_retention" {
+  description = "Retention for the weekly Firestore backup schedule. Google supports up to 14 weeks."
+  type        = string
+  default     = "4838400s"
+}
+
+variable "billing_account_id" {
+  description = "Optional Cloud Billing account ID. A project-scoped budget is created only when this and budget_currency_code are set."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "budget_currency_code" {
+  description = "Optional billing-account currency (ISO 4217). Must match the billing account; intentionally has no guessed default."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "monthly_budget_units" {
+  description = "Whole currency units for the optional monthly project budget."
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.monthly_budget_units >= 1
+    error_message = "monthly_budget_units must be at least 1."
+  }
+}
