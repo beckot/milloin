@@ -4,3 +4,12 @@ region     = "europe-north1"
 
 # Personal service cost guardrail.
 max_instances = 3
+
+# Optional: receive uptime incidents by email.
+# operator_email = "you@example.com"
+
+# Optional: create a project-scoped monthly Cloud Billing budget.
+# The currency must match the billing account, so there is intentionally no guessed default.
+# billing_account_id   = "000000-000000-000000"
+# budget_currency_code = "EUR"
+# monthly_budget_units = 10
