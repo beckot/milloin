@@ -17,6 +17,13 @@ yarn-error.log*
 *.sqlite3
 *.db
 
+# Terraform local state and machine-specific values
+**/.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+.terraform.tfstate.lock.info
+
 .DS_Store
 Thumbs.db
 .idea/
