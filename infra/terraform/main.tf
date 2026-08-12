@@ -190,6 +190,12 @@ resource "google_project_iam_member" "deploy_cloud_run" {
   member  = "serviceAccount:${google_service_account.deploy.email}"
 }
 
+resource "google_project_iam_member" "deploy_secret_viewer" {
+  project = var.project_id
+  role    = "roles/secretmanager.viewer"
+  member  = "serviceAccount:${google_service_account.deploy.email}"
+}
+
 resource "google_service_account_iam_member" "deploy_uses_runtime_identity" {
   service_account_id = google_service_account.runtime.name
   role               = "roles/iam.serviceAccountUser"
