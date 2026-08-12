@@ -9,6 +9,7 @@ export default defineConfig({
   reporter: process.env.CI ? "line" : "list",
   use: {
     baseURL,
+    locale: "fi-FI",
     trace: "retain-on-failure",
   },
   projects: [
