@@ -4,7 +4,7 @@ import { createOwnerSession } from "../src/auth/session";
 const baseURL = "http://127.0.0.1:3000";
 const secret = "0123456789abcdef0123456789abcdef";
 
-test("organizer creates poll, participant votes, edits, and organizer finalizes", async ({ context, page }) => {
+test("organizer creates poll, participant votes, edits, finalizes, and deletes", async ({ context, page }) => {
   const session = await createOwnerSession(
     { sub: "google-test", email: "otto@example.com", name: "Otto" },
     secret,
@@ -48,4 +48,10 @@ test("organizer creates poll, participant votes, edits, and organizer finalizes"
 
   await page.goto(publicUrl);
   await expect(page.getByText("Kysely on suljettu")).toBeVisible();
+
+  await page.goto(adminUrl);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Poista kysely" }).click();
+  await expect(page).toHaveURL(`${baseURL}/`);
+  await expect(page.getByRole("heading", { name: "Sovitaan aika ilman säätöä." })).toBeVisible();
 });
