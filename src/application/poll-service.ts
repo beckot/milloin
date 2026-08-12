@@ -46,36 +46,40 @@ export class PollService {
   }
 
   async addSlot(publicToken: string, ownerId: string, slot: Slot): Promise<Poll> {
-    const aggregate = await this.requireOwner(publicToken, ownerId);
-    aggregate.poll = addSlot(aggregate.poll, slot);
-    await this.repository.save(publicToken, aggregate);
-    return aggregate.poll;
+    const updated = await this.repository.update(publicToken, (aggregate) => {
+      this.assertOwner(aggregate, ownerId);
+      return { ...aggregate, poll: addSlot(aggregate.poll, slot) };
+    });
+    return updated.poll;
   }
 
   async removeSlot(publicToken: string, ownerId: string, slotId: string): Promise<Poll> {
-    const aggregate = await this.requireOwner(publicToken, ownerId);
-    aggregate.poll = deleteSlot(aggregate.poll, slotId);
-    await this.repository.save(publicToken, aggregate);
-    return aggregate.poll;
+    const updated = await this.repository.update(publicToken, (aggregate) => {
+      this.assertOwner(aggregate, ownerId);
+      return { ...aggregate, poll: deleteSlot(aggregate.poll, slotId) };
+    });
+    return updated.poll;
   }
 
   async createParticipantResponse(
     publicToken: string,
     input: CreateParticipantInput,
   ): Promise<{ participantId: string; editToken: string; poll: Poll }> {
-    const aggregate = await this.requireAggregate(publicToken);
     const participantId = randomUUID();
     const editToken = token(32);
+    const updated = await this.repository.update(publicToken, (aggregate) => ({
+      poll: submitAvailability(aggregate.poll, {
+        participantId,
+        displayName: input.displayName,
+        votes: input.votes,
+      }),
+      participantEditTokenHashes: {
+        ...aggregate.participantEditTokenHashes,
+        [participantId]: hashToken(editToken),
+      },
+    }));
 
-    aggregate.poll = submitAvailability(aggregate.poll, {
-      participantId,
-      displayName: input.displayName,
-      votes: input.votes,
-    });
-    aggregate.participantEditTokenHashes[participantId] = hashToken(editToken);
-    await this.repository.save(publicToken, aggregate);
-
-    return { participantId, editToken, poll: aggregate.poll };
+    return { participantId, editToken, poll: updated.poll };
   }
 
   async updateParticipantResponse(
@@ -84,44 +88,50 @@ export class PollService {
     editToken: string,
     input: CreateParticipantInput,
   ): Promise<Poll> {
-    const aggregate = await this.requireAggregate(publicToken);
-    const expectedHash = aggregate.participantEditTokenHashes[participantId];
-    if (!expectedHash || !secureTokenMatches(editToken, expectedHash)) {
-      throw new Error("Participant capability token is not authorized");
-    }
-
-    aggregate.poll = submitAvailability(aggregate.poll, {
-      participantId,
-      displayName: input.displayName,
-      votes: input.votes,
+    const updated = await this.repository.update(publicToken, (aggregate) => {
+      const expectedHash = aggregate.participantEditTokenHashes[participantId];
+      if (!expectedHash || !secureTokenMatches(editToken, expectedHash)) {
+        throw new Error("Participant capability token is not authorized");
+      }
+      return {
+        ...aggregate,
+        poll: submitAvailability(aggregate.poll, {
+          participantId,
+          displayName: input.displayName,
+          votes: input.votes,
+        }),
+      };
     });
-    await this.repository.save(publicToken, aggregate);
-    return aggregate.poll;
+    return updated.poll;
   }
 
   async selectWinner(publicToken: string, ownerId: string, slotId: string): Promise<Poll> {
-    const aggregate = await this.requireOwner(publicToken, ownerId);
-    aggregate.poll = selectWinner(aggregate.poll, slotId);
-    await this.repository.save(publicToken, aggregate);
-    return aggregate.poll;
+    const updated = await this.repository.update(publicToken, (aggregate) => {
+      this.assertOwner(aggregate, ownerId);
+      return { ...aggregate, poll: selectWinner(aggregate.poll, slotId) };
+    });
+    return updated.poll;
   }
 
   async closePoll(publicToken: string, ownerId: string): Promise<Poll> {
-    const aggregate = await this.requireOwner(publicToken, ownerId);
-    aggregate.poll = closePoll(aggregate.poll);
-    await this.repository.save(publicToken, aggregate);
-    return aggregate.poll;
+    const updated = await this.repository.update(publicToken, (aggregate) => {
+      this.assertOwner(aggregate, ownerId);
+      return { ...aggregate, poll: closePoll(aggregate.poll) };
+    });
+    return updated.poll;
   }
 
   async reopenPoll(publicToken: string, ownerId: string): Promise<Poll> {
-    const aggregate = await this.requireOwner(publicToken, ownerId);
-    aggregate.poll = reopenPoll(aggregate.poll);
-    await this.repository.save(publicToken, aggregate);
-    return aggregate.poll;
+    const updated = await this.repository.update(publicToken, (aggregate) => {
+      this.assertOwner(aggregate, ownerId);
+      return { ...aggregate, poll: reopenPoll(aggregate.poll) };
+    });
+    return updated.poll;
   }
 
   async deletePoll(publicToken: string, ownerId: string): Promise<void> {
-    await this.requireOwner(publicToken, ownerId);
+    const aggregate = await this.requireAggregate(publicToken);
+    this.assertOwner(aggregate, ownerId);
     await this.repository.delete(publicToken);
   }
 
@@ -131,9 +141,7 @@ export class PollService {
     return aggregate;
   }
 
-  private async requireOwner(publicToken: string, ownerId: string): Promise<PollAggregate> {
-    const aggregate = await this.requireAggregate(publicToken);
+  private assertOwner(aggregate: PollAggregate, ownerId: string): void {
     if (aggregate.poll.ownerId !== ownerId) throw new Error("Owner is not authorized for this poll");
-    return aggregate;
   }
 }
