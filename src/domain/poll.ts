@@ -29,8 +29,13 @@ export type Poll = {
 export type CreatePollInput = Pick<Poll, "ownerId" | "title" | "timezone" | "durationMinutes"> &
   Partial<Pick<Poll, "description" | "location">> & { id?: string };
 
+export type UpdatePollInput = Partial<
+  Pick<Poll, "title" | "description" | "location" | "timezone" | "durationMinutes">
+>;
+
 export function createPoll(input: CreatePollInput): Poll {
   if (!input.title.trim()) throw new Error("Poll title is required");
+  if (!input.timezone.trim()) throw new Error("Poll timezone is required");
   if (!Number.isInteger(input.durationMinutes) || input.durationMinutes <= 0) {
     throw new Error("Duration must be a positive whole number of minutes");
   }
@@ -41,11 +46,33 @@ export function createPoll(input: CreatePollInput): Poll {
     title: input.title.trim(),
     description: input.description?.trim() || undefined,
     location: input.location?.trim() || undefined,
-    timezone: input.timezone,
+    timezone: input.timezone.trim(),
     durationMinutes: input.durationMinutes,
     status: "OPEN",
     slots: [],
     participants: [],
+  };
+}
+
+export function updatePoll(poll: Poll, input: UpdatePollInput): Poll {
+  const title = input.title === undefined ? poll.title : input.title.trim();
+  const timezone = input.timezone === undefined ? poll.timezone : input.timezone.trim();
+  const durationMinutes = input.durationMinutes ?? poll.durationMinutes;
+
+  if (!title) throw new Error("Poll title is required");
+  if (!timezone) throw new Error("Poll timezone is required");
+  if (!Number.isInteger(durationMinutes) || durationMinutes <= 0) {
+    throw new Error("Duration must be a positive whole number of minutes");
+  }
+
+  return {
+    ...poll,
+    title,
+    timezone,
+    durationMinutes,
+    description:
+      input.description === undefined ? poll.description : input.description.trim() || undefined,
+    location: input.location === undefined ? poll.location : input.location.trim() || undefined,
   };
 }
 
