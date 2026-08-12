@@ -15,6 +15,12 @@ variable "service_name" {
   default     = "milloin"
 }
 
+variable "github_repository" {
+  description = "Exact GitHub owner/repository allowed to impersonate the deployment service account via OIDC."
+  type        = string
+  default     = "beckot/milloin"
+}
+
 variable "bootstrap_image" {
   description = "Known-good image used only to create the Cloud Run service before the application deployment pipeline publishes the real image."
   type        = string
