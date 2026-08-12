@@ -10,6 +10,8 @@
     "test": "vitest run src",
     "test:watch": "vitest src",
     "test:e2e": "playwright test",
+    "test:production:api": "node scripts/production-smoke.mjs",
+    "test:production:ui": "playwright test --config=playwright.production.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
