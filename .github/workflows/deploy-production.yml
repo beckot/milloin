@@ -56,6 +56,51 @@ jobs:
           echo "build=$build" >> "$GITHUB_OUTPUT"
           echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve production runtime configuration
+        id: runtime
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          OWNER_EMAIL: ${{ vars.MILLOIN_OWNER_EMAIL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$OWNER_EMAIL" ]; then
+            echo "GitHub production variable MILLOIN_OWNER_EMAIL is required." >&2
+            exit 1
+          fi
+
+          service_url=$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --format='value(status.url)')
+          if [ -z "$service_url" ]; then
+            echo "Could not resolve the Cloud Run service URL." >&2
+            exit 1
+          fi
+
+          latest_enabled_version() {
+            local secret="$1"
+            local version
+            version=$(gcloud secrets versions list "$secret" \
+              --project "$PROJECT_ID" \
+              --filter='state=ENABLED' \
+              --sort-by='~createTime' \
+              --limit=1 \
+              --format='value(name)')
+            version="${version##*/}"
+            if [ -z "$version" ]; then
+              echo "Secret $secret has no enabled version." >&2
+              exit 1
+            fi
+            printf '%s' "$version"
+          }
+
+          echo "base_url=$service_url" >> "$GITHUB_OUTPUT"
+          echo "google_client_id_version=$(latest_enabled_version google-client-id)" >> "$GITHUB_OUTPUT"
+          echo "google_client_secret_version=$(latest_enabled_version google-client-secret)" >> "$GITHUB_OUTPUT"
+          echo "session_secret_version=$(latest_enabled_version milloin-session-secret)" >> "$GITHUB_OUTPUT"
+          echo "owner_api_key_version=$(latest_enabled_version milloin-owner-api-key)" >> "$GITHUB_OUTPUT"
+          echo "OAuth redirect URI must be configured as: ${service_url}/api/auth/google/callback"
+
       - name: Build tested revision
         if: steps.image.outputs.build == 'true'
         run: docker build --tag "${{ steps.image.outputs.image }}" .
@@ -64,15 +109,23 @@ jobs:
         if: steps.image.outputs.build == 'true'
         run: docker push "${{ steps.image.outputs.image }}"
 
-      - name: Deploy candidate with zero production traffic
+      - name: Deploy configured candidate with zero production traffic
         env:
           PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          OWNER_EMAIL: ${{ vars.MILLOIN_OWNER_EMAIL }}
+          BASE_URL: ${{ steps.runtime.outputs.base_url }}
           CANDIDATE_TAG: ${{ steps.image.outputs.candidate }}
+          GOOGLE_CLIENT_ID_VERSION: ${{ steps.runtime.outputs.google_client_id_version }}
+          GOOGLE_CLIENT_SECRET_VERSION: ${{ steps.runtime.outputs.google_client_secret_version }}
+          SESSION_SECRET_VERSION: ${{ steps.runtime.outputs.session_secret_version }}
+          OWNER_API_KEY_VERSION: ${{ steps.runtime.outputs.owner_api_key_version }}
         run: |
           gcloud run services update "$SERVICE_NAME" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
             --image "${{ steps.image.outputs.image }}" \
+            --update-env-vars "MILLOIN_BASE_URL=${BASE_URL},MILLOIN_OWNER_EMAIL=${OWNER_EMAIL}" \
+            --update-secrets "GOOGLE_CLIENT_ID=google-client-id:${GOOGLE_CLIENT_ID_VERSION},GOOGLE_CLIENT_SECRET=google-client-secret:${GOOGLE_CLIENT_SECRET_VERSION},MILLOIN_SESSION_SECRET=milloin-session-secret:${SESSION_SECRET_VERSION},MILLOIN_OWNER_API_KEY=milloin-owner-api-key:${OWNER_API_KEY_VERSION}" \
             --no-traffic \
             --tag "$CANDIDATE_TAG" \
             --quiet
