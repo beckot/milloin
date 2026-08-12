@@ -5,9 +5,11 @@ export type PollAggregate = {
   participantEditTokenHashes: Record<string, string>;
 };
 
+export type PollUpdater = (aggregate: PollAggregate) => PollAggregate;
+
 export interface PollRepository {
   create(publicToken: string, aggregate: PollAggregate): Promise<void>;
   getByPublicToken(publicToken: string): Promise<PollAggregate | null>;
-  save(publicToken: string, aggregate: PollAggregate): Promise<void>;
+  update(publicToken: string, updater: PollUpdater): Promise<PollAggregate>;
   delete(publicToken: string): Promise<void>;
 }
