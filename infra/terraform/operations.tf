@@ -109,8 +109,8 @@ resource "google_monitoring_alert_policy" "uptime_failure" {
 
 # Billing-account configuration is deliberately optional because billing
 # account IDs and currencies are user-specific. When supplied, this creates a
-# project-scoped monthly budget with current and forecast thresholds. Google
-# sends notifications to eligible project-level recipients.
+# project-scoped monthly budget with current and forecast thresholds. Standard
+# Cloud Billing budget recipients remain in effect unless changed separately.
 resource "google_billing_budget" "personal_service" {
   count = local.create_budget ? 1 : 0
 
@@ -144,10 +144,6 @@ resource "google_billing_budget" "personal_service" {
   threshold_rules {
     threshold_percent = 1.0
     spend_basis       = "FORECASTED_SPEND"
-  }
-
-  all_updates_rule {
-    enable_project_level_recipients = true
   }
 
   depends_on = [google_project_service.required]
