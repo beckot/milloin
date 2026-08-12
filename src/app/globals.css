@@ -6,12 +6,11 @@
 }
 
 * { box-sizing: border-box; }
-
 body { margin: 0; min-height: 100vh; background: #f6f6f3; }
-
 a { color: inherit; text-decoration: none; }
-
 button, input, textarea, select { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
 
 .shell {
   min-height: 100vh;
@@ -19,11 +18,87 @@ button, input, textarea, select { font: inherit; }
   place-items: center;
   padding: 24px;
 }
-
 .hero { width: min(680px, 100%); }
-.eyebrow { font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 18px; }
-h1 { font-size: clamp(42px, 8vw, 72px); line-height: .98; letter-spacing: -.045em; margin: 0; }
-.lead { font-size: 20px; line-height: 1.45; max-width: 600px; margin: 24px 0 0; color: #4b4b46; }
-.actions { margin-top: 32px; }
-.primary { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 12px; background: #171717; color: white; font-weight: 700; }
-.hint { margin-top: 16px; color: #72726b; font-size: 14px; }
+.eyebrow { font-size: 12px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; margin: 0 0 12px; color: #676760; }
+h1 { font-size: clamp(36px, 8vw, 64px); line-height: 1; letter-spacing: -.04em; margin: 0; }
+h2 { margin: 0 0 16px; font-size: 22px; letter-spacing: -.02em; }
+.lead { font-size: 19px; line-height: 1.5; max-width: 600px; margin: 22px 0 0; color: #4b4b46; }
+.actions { margin-top: 28px; }
+.hint, .muted { color: #72726b; }
+.hint { margin-top: 14px; font-size: 14px; }
+
+.page-shell { width: min(1040px, 100%); margin: 0 auto; padding: 18px 18px 64px; }
+.topbar { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { font-size: 19px; font-weight: 800; letter-spacing: -.035em; }
+.panel { background: #fff; border: 1px solid #e7e7e1; border-radius: 22px; padding: clamp(20px, 4vw, 36px); box-shadow: 0 10px 35px rgba(0,0,0,.04); }
+.panel.narrow { width: min(680px, 100%); margin: 0 auto; }
+.panel h1 { font-size: clamp(30px, 6vw, 48px); margin-bottom: 10px; }
+
+.form-stack, .vote-form { display: grid; gap: 20px; margin-top: 26px; }
+label { display: grid; gap: 8px; font-size: 14px; font-weight: 700; }
+input, select, textarea { width: 100%; min-height: 46px; border: 1px solid #d8d8d1; background: #fff; color: #171717; border-radius: 10px; padding: 10px 12px; outline: none; }
+input:focus, select:focus, textarea:focus { border-color: #171717; box-shadow: 0 0 0 3px rgba(23,23,23,.08); }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+legend { font-weight: 750; margin-bottom: 10px; }
+.candidate-list { display: grid; gap: 10px; margin-bottom: 12px; }
+.candidate-row { display: grid; grid-template-columns: 1fr 130px auto; gap: 10px; align-items: end; border: 1px solid #ededE8; border-radius: 13px; padding: 12px; }
+.inline-form { display: grid; grid-template-columns: 1fr 130px auto; align-items: end; gap: 10px; margin: 22px 0; }
+
+.primary, .secondary, .choice { border: 0; display: inline-flex; min-height: 46px; align-items: center; justify-content: center; padding: 0 18px; border-radius: 11px; font-weight: 750; text-decoration: none; }
+.primary { background: #171717; color: white; }
+.primary:hover { background: #2f2f2d; }
+.secondary { background: #efefe9; color: #171717; }
+.secondary:hover { background: #e7e7df; }
+.wide { width: 100%; }
+.small { min-height: 38px; padding: 0 12px; font-size: 13px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.text-button { border: 0; background: transparent; padding: 8px 4px; text-decoration: underline; text-underline-offset: 3px; }
+.danger { color: #a12b25; }
+.button-row { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+
+.notice, .success, .error, .winner { border-radius: 12px; padding: 13px 14px; margin-top: 16px; }
+.notice { background: #f1f1eb; }
+.success { background: #edf6ed; color: #245c2b; }
+.error { background: #fff0ee; color: #8a2822; }
+.winner { background: #f3f1e7; }
+
+.poll-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.status { display: inline-flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 750; white-space: nowrap; }
+.status.closed { background: #ecece7; }
+.share-box { display: grid; gap: 10px; background: #f7f7f3; border-radius: 14px; padding: 14px; margin: 18px 0; }
+.share-box code { overflow-wrap: anywhere; font-size: 13px; color: #55554f; }
+
+.slot-votes { display: grid; gap: 10px; }
+.vote-card { border: 1px solid #e3e3dd; border-radius: 14px; padding: 14px; }
+.vote-card legend { padding: 0 4px; margin: 0; font-size: 15px; }
+.choice-row { display: flex; gap: 8px; margin: 10px 0 6px; }
+.choice { flex: 1; background: #f0f0eb; }
+.choice.selected.yes { background: #dcefdc; color: #164c20; }
+.choice.selected.no { background: #f3dfdd; color: #74241f; }
+
+.results { margin-top: 28px; }
+.matrix-wrap { overflow-x: auto; border: 1px solid #e5e5df; border-radius: 14px; }
+table { width: 100%; border-collapse: collapse; min-width: 520px; }
+th, td { padding: 11px 12px; border-bottom: 1px solid #ecece7; text-align: center; font-size: 14px; }
+th:first-child { text-align: left; position: sticky; left: 0; background: #fff; }
+thead th { font-size: 12px; color: #64645e; background: #fafaf7; }
+.totals th, .totals td { font-weight: 800; }
+
+.admin-slots { display: grid; gap: 10px; margin-top: 16px; }
+.admin-slot { display: flex; justify-content: space-between; gap: 14px; align-items: center; border: 1px solid #e4e4de; border-radius: 14px; padding: 13px 14px; }
+.admin-slot > div:first-child { display: grid; gap: 4px; }
+.admin-slot span { font-size: 13px; color: #686862; }
+.winner-slot { background: #f4f2e8; border-color: #dcd7c4; }
+.final-actions { margin-top: 20px; }
+
+@media (max-width: 640px) {
+  .page-shell { padding: 10px 10px 42px; }
+  .panel { border-radius: 16px; padding: 18px 15px 24px; }
+  .candidate-row, .inline-form { grid-template-columns: 1fr 1fr; }
+  .candidate-row .text-button, .inline-form button { grid-column: 1 / -1; }
+  .poll-heading, .admin-slot { align-items: stretch; flex-direction: column; }
+  .admin-slot .button-row { width: 100%; }
+  .admin-slot .button-row > * { flex: 1; }
+  .choice-row { flex-wrap: wrap; }
+  .choice { min-width: 90px; }
+}
