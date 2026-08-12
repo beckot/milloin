@@ -7,9 +7,11 @@ import {
   reopenPoll,
   selectWinner,
   submitAvailability,
+  updatePoll,
   type CreatePollInput,
   type Poll,
   type Slot,
+  type UpdatePollInput,
   type Vote,
 } from "../domain/poll";
 import type { PollAggregate, PollRepository } from "./poll-repository";
@@ -43,6 +45,14 @@ export class PollService {
 
   async getPublicPoll(publicToken: string): Promise<Poll> {
     return (await this.requireAggregate(publicToken)).poll;
+  }
+
+  async updatePoll(publicToken: string, ownerId: string, input: UpdatePollInput): Promise<Poll> {
+    const updated = await this.repository.update(publicToken, (aggregate) => {
+      this.assertOwner(aggregate, ownerId);
+      return { ...aggregate, poll: updatePoll(aggregate.poll, input) };
+    });
+    return updated.poll;
   }
 
   async addSlot(publicToken: string, ownerId: string, slot: Slot): Promise<Poll> {
