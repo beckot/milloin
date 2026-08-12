@@ -1,4 +1,8 @@
-import type { PollAggregate, PollRepository } from "../application/poll-repository";
+import type {
+  PollAggregate,
+  PollRepository,
+  PollUpdater,
+} from "../application/poll-repository";
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -15,9 +19,12 @@ export class InMemoryPollRepository implements PollRepository {
     return aggregate ? clone(aggregate) : null;
   }
 
-  async save(publicToken: string, aggregate: PollAggregate): Promise<void> {
-    if (!this.items.has(publicToken)) throw new Error("Poll not found");
-    this.items.set(publicToken, clone(aggregate));
+  async update(publicToken: string, updater: PollUpdater): Promise<PollAggregate> {
+    const current = this.items.get(publicToken);
+    if (!current) throw new Error("Poll not found");
+    const updated = updater(clone(current));
+    this.items.set(publicToken, clone(updated));
+    return clone(updated);
   }
 
   async delete(publicToken: string): Promise<void> {
