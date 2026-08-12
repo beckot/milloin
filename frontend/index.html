@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Milloin? — Sopiva aika helposti ilman kirjautumista</title>
+  <meta name="description" content="Luo kysely, ehdota aikoja ja löydä kaikille sopiva tapaaminen nopeasti ilman mainoksia tai kirjautumista.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./src/style.css">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+<body>
+  <div id="app" class="app-container">
+    <!-- Top Header -->
+    <header class="main-header">
+      <div class="header-inner">
+        <a href="#/new" id="logo-link" class="brand-logo">
+          <span class="logo-icon">📅</span>
+          <span class="logo-text">milloin<span class="logo-dot">.fi</span></span>
+        </a>
+        <div class="header-actions">
+          <a href="#/new" id="btn-header-new-poll" class="btn btn-secondary btn-sm">
+            <span>+ Luo kysely</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main id="main-content" class="content-wrapper">
+      
+      <!-- VIEW 1: CREATE POLL -->
+      <section id="view-create" class="view-panel active">
+        <div class="hero-section">
+          <span class="badge badge-accent">100% Ilmainen & Yksityinen</span>
+          <h1 class="hero-title">Löydä kaikille sopiva aika hetkessä</h1>
+          <p class="hero-sub">Ehdota muutamaa aikaa, jaa linkki osallistujille ja katso tulokset reaaliajassa. Ei rekisteröitymistä.</p>
+        </div>
+
+        <div class="card form-card">
+          <form id="poll-create-form" autocomplete="off">
+            <div class="form-group">
+              <label for="poll-title" class="form-label">Kyselyn otsikko <span class="required">*</span></label>
+              <input type="text" id="poll-title" class="form-input" placeholder="esim. Projektipalaveri, Kahvitauko tai Lounas" required maxlength="120">
+            </div>
+
+            <div class="form-group">
+              <label for="poll-desc" class="form-label">Kuvaus tai lisätiedot (valinnainen)</label>
+              <textarea id="poll-desc" class="form-input form-textarea" placeholder="esim. Agendana käydä läpi ensi viikon aikataulu ja tehtävät" rows="2" maxlength="300"></textarea>
+            </div>
+
+            <div class="form-group">
+              <div class="label-row">
+                <label class="form-label">Aikaehdotukset <span class="required">*</span></label>
+                <span class="label-hint">Syötä pvm & klo</span>
+              </div>
+              
+              <!-- Quick Time Preset Helpers -->
+              <div class="presets-row">
+                <span class="preset-label">Pikalisäys:</span>
+                <button type="button" class="btn-chip" id="btn-add-tomorrow-10">Huomenna 10:00</button>
+                <button type="button" class="btn-chip" id="btn-add-tomorrow-14">Huomenna 14:00</button>
+                <button type="button" class="btn-chip" id="btn-add-nextweek-10">Ensi ma 10:00</button>
+              </div>
+
+              <div id="options-list" class="options-list">
+                <!-- Option inputs rendered dynamically -->
+              </div>
+
+              <button type="button" id="btn-add-option" class="btn btn-ghost btn-add-row">
+                <span>+ Lisää aikaehdotus</span>
+              </button>
+            </div>
+
+            <!-- Anti-Spam Turnstile Widget -->
+            <div class="form-group captcha-group">
+              <div id="create-turnstile" class="cf-turnstile" data-sitekey="0x4AAAAAAAxxxxxxxxxxxxxx" data-theme="dark"></div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-submit-create" class="btn btn-primary btn-lg btn-block">
+                <span>Luo kysely ja hae linkki</span>
+                <span class="btn-arrow">→</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- VIEW 2: POLL DETAILS & VOTING GRID -->
+      <section id="view-poll" class="view-panel">
+        <div id="poll-header-card" class="card poll-header-card">
+          <div class="poll-badge-row">
+            <span id="poll-status-badge" class="badge badge-success">Avoinna</span>
+            <span id="poll-created-at" class="poll-meta-date">Luotu...</span>
+          </div>
+          <h1 id="poll-display-title" class="poll-title">Ladataan kyselyä...</h1>
+          <p id="poll-display-desc" class="poll-description"></p>
+
+          <!-- Top Winner Announcement Banner -->
+          <div id="winner-banner" class="winner-banner hidden">
+            <div class="winner-icon">🏆</div>
+            <div class="winner-info">
+              <span class="winner-label">Suosituin aika</span>
+              <span id="winner-text" class="winner-time">-</span>
+            </div>
+          </div>
+
+          <!-- Share Link Box -->
+          <div class="share-box">
+            <div class="share-box-header">
+              <span class="share-title">🔗 Jaa kyselyn linkki osallistujille</span>
+            </div>
+            <div class="share-input-group">
+              <input type="text" id="share-url-input" class="form-input share-input" readonly>
+              <button type="button" id="btn-copy-link" class="btn btn-secondary">
+                <span id="copy-btn-text">Kopioi linkki</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Admin Notice if Admin Token is present -->
+          <div id="admin-banner" class="admin-banner hidden">
+            <span class="admin-icon">🔑</span>
+            <span class="admin-text">Olet tämän kyselyn luoja. Voit lukita äänestyksen tai valita lopullisen ajan.</span>
+            <button type="button" id="btn-toggle-lock" class="btn btn-sm btn-outline-danger">Sulje kysely</button>
+          </div>
+        </div>
+
+        <!-- Voting Grid Matrix Card -->
+        <div class="card grid-card">
+          <div class="grid-card-header">
+            <h2>Vastausten yhteenveto & äänestys</h2>
+            <span id="voter-count-tag" class="badge badge-neutral">0 vastausta</span>
+          </div>
+
+          <div id="voting-grid-container" class="grid-responsive-wrapper">
+            <!-- Dynamic Matrix Table injected here -->
+          </div>
+
+          <!-- Submit Vote Form -->
+          <div id="vote-form-container" class="vote-form-box">
+            <h3 id="vote-form-title">Ilmoita oma sopivuutesi</h3>
+            <form id="vote-submit-form">
+              <div class="form-group">
+                <label for="voter-name" class="form-label">Nimesi <span class="required">*</span></label>
+                <input type="text" id="voter-name" class="form-input" placeholder="esim. Matti Meikäläinen" required maxlength="60">
+              </div>
+
+              <div id="vote-options-selectors" class="vote-options-list">
+                <!-- Option vote selectors injected here -->
+              </div>
+
+              <!-- Anti-Spam Turnstile Widget for Voting -->
+              <div class="form-group captcha-group">
+                <div id="vote-turnstile" class="cf-turnstile" data-sitekey="0x4AAAAAAAxxxxxxxxxxxxxx" data-theme="dark"></div>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" id="btn-submit-vote" class="btn btn-primary btn-lg">
+                  <span>Tallenna vastauksesi</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: NOT FOUND / ERROR -->
+      <section id="view-not-found" class="view-panel text-center">
+        <div class="card empty-card">
+          <div class="empty-icon">🔍</div>
+          <h2>Kyselyä ei löytynyt</h2>
+          <p>Tarkista linkki tai luo uusi kysely alla olevasta painikkeesta.</p>
+          <a href="#/new" class="btn btn-primary">Luo uusi kysely</a>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+      <div class="footer-inner">
+        <p>© 2026 milloin.fi — Kevyt & maksuton aikaehdotustyökalu</p>
+        <p class="footer-sub">Suomalaiseen makuun. Ei evästekyselyitä eikä mainosseurantaa.</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
