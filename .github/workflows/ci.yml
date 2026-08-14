@@ -20,6 +20,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: node --check scripts/production-smoke.mjs
+      - run: bash -n scripts/bootstrap-production.sh
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
